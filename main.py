@@ -18,7 +18,7 @@ def create_product_schema() -> Schema:
     schema.add_field(Field("IDP", "integer"))
     schema.add_field(Field("name", "string"))
     schema.add_field(Field("brand", "string"))
-    schema.add_field(Field("description", "string", is_long_string=True))
+    schema.add_field(Field("description", "longstring"))
     schema.add_field(Field("image_url", "string"))
     
     # Price nested object
@@ -66,10 +66,10 @@ def create_orderline_schema() -> Schema:
     schema = Schema("OrderLine")
     schema.add_field(Field("IDC", "integer"))
     schema.add_field(Field("IDP", "integer"))
-    schema.add_field(Field("date", "string"))  # Will be recognized as date
+    schema.add_field(Field("date", "date"))
     schema.add_field(Field("quantity", "integer"))
-    schema.add_field(Field("deliveryDate", "string"))
-    schema.add_field(Field("comment", "string", is_long_string=True))
+    schema.add_field(Field("deliveryDate", "date"))
+    schema.add_field(Field("comment", "longstring"))
     schema.add_field(Field("grade", "integer"))
     return schema
 
@@ -79,9 +79,9 @@ def create_client_schema() -> Schema:
     schema.add_field(Field("IDC", "integer"))
     schema.add_field(Field("ln", "string"))
     schema.add_field(Field("fn", "string"))
-    schema.add_field(Field("address", "string", is_long_string=True))
+    schema.add_field(Field("address", "longstring"))
     schema.add_field(Field("nationality", "string"))
-    schema.add_field(Field("birthDate", "string"))
+    schema.add_field(Field("birthDate", "date"))
     schema.add_field(Field("email", "string"))
     return schema
 

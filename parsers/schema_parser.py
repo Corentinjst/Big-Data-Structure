@@ -65,12 +65,17 @@ class SchemaParser:
         
         # Handle basic types
         else:
-            # Check if it's a long string (description, comment, etc.)
-            is_long = name.lower() in ['description', 'comment', 'address']
-            
+            # Infer proper types based on field name if type is string
+            if field_type == 'string':
+                # Check if it's a date field
+                if 'date' in name.lower() or name.lower() in ['date', 'birthdate', 'deliverydate']:
+                    field_type = 'date'
+                # Check if it's a long string field
+                elif name.lower() in ['description', 'comment', 'address', 'notes', 'specifications']:
+                    field_type = 'longstring'
+
             return Field(
                 name=name,
                 field_type=field_type,
-                is_required=is_required,
-                is_long_string=is_long
+                is_required=is_required
             )

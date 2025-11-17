@@ -52,12 +52,13 @@ class SizeCalculator:
             size += NUMBER_SIZE
         
         elif field.field_type == 'string':
-            if field.name == 'date' or field.name.endswith('Date'):
-                size += DATE_SIZE
-            elif field.is_long_string:
-                size += LONG_STRING_SIZE
-            else:
-                size += STRING_SIZE
+            size += STRING_SIZE
+
+        elif field.field_type == 'date':
+            size += DATE_SIZE
+
+        elif field.field_type == 'longstring':
+            size += LONG_STRING_SIZE
         
         # Nested objects
         elif field.field_type == 'object' and field.nested_schema:

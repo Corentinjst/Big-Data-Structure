@@ -9,9 +9,8 @@ from dataclasses import dataclass, field
 class Field:
     """Represents a single field in a schema"""
     name: str
-    field_type: str  # 'integer', 'string', 'object', 'array', etc.
+    field_type: str  # 'integer', 'string', 'date', 'longstring', 'object', 'array', etc.
     is_required: bool = True
-    is_long_string: bool = False  # For descriptions, comments, etc.
     nested_schema: Optional['Schema'] = None
     array_item_schema: Optional['Schema'] = None
     
