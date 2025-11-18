@@ -1,0 +1,78 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "OrderLine_DB4",
+  "type": "object",
+  "properties": {
+    "idc": { "type": "integer" },
+    "idp": { "type": "integer" },
+    "date": { "type": "string" },
+    "quantity": { "type": "integer" },
+    "delivery_date": { "type": "string" },
+    "comment": { "type": "string" },
+    "grade": { "type": "integer" },
+
+    "product": {
+      "type": "object",
+      "properties": {
+        "idp": { "type": "integer" },
+        "name": { "type": "string" },
+        "brand": { "type": "string" },
+        "description": { "type": "string" },
+        "image_url": { "type": "string" },
+
+        "price": {
+          "type": "object",
+          "properties": {
+            "amount":   { "type": "number" },
+            "currency": { "type": "string" },
+            "vatRate":  { "type": "number" }
+          },
+          "required": ["amount", "currency", "vatRate"]
+        },
+
+        "supplier": {
+          "type": "object",
+          "properties": {
+            "ids":        { "type": "integer" },
+            "name":       { "type": "string" },
+            "siret":      { "type": "string" },
+            "headOffice": { "type": "string" },
+            "revenue":    { "type": "number" }
+          },
+          "required": ["ids", "name", "siret", "headOffice", "revenue"]
+        },
+
+        "categories": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "title": { "type": "string" }
+            },
+            "required": ["title"]
+          }
+        }
+      },
+      "required": [
+        "idp",
+        "name",
+        "brand",
+        "description",
+        "image_url",
+        "price",
+        "supplier",
+        "categories"
+      ]
+    }
+  },
+  "required": [
+    "idc",
+    "idp",
+    "date",
+    "quantity",
+    "delivery_date",
+    "comment",
+    "grade",
+    "product"
+  ]
+}
