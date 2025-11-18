@@ -18,7 +18,7 @@ def create_product_schema() -> Schema:
     schema.add_field(Field("IDP", "integer"))
     schema.add_field(Field("name", "string"))
     schema.add_field(Field("brand", "string"))
-    schema.add_field(Field("description", "longstring"))
+    schema.add_field(Field("description", "string")) #changed from longstring to string because of the correction
     schema.add_field(Field("image_url", "string"))
     
     # Price nested object
@@ -37,8 +37,8 @@ def create_product_schema() -> Schema:
     supp_schema = Schema("supplier")
     supp_schema.add_field(Field("IDS", "integer"))
     supp_schema.add_field(Field("name", "string"))
-    supp_schema.add_field(Field("SIRET", "string"))
-    supp_schema.add_field(Field("headOffice", "string"))
+    # drop pour DB1 supp_schema.add_field(Field("SIRET", "string"))
+    # drop pour DB1 supp_schema.add_field(Field("headOffice", "string"))
     supp_schema.add_field(Field("revenue", "integer"))
     schema.add_field(Field("supplier", "object", nested_schema=supp_schema))
     
@@ -79,7 +79,7 @@ def create_client_schema() -> Schema:
     schema.add_field(Field("IDC", "integer"))
     schema.add_field(Field("ln", "string"))
     schema.add_field(Field("fn", "string"))
-    schema.add_field(Field("address", "longstring"))
+    schema.add_field(Field("address", "string")) #changed from longstring to string because of the correction
     schema.add_field(Field("nationality", "string"))
     schema.add_field(Field("birthDate", "date"))
     schema.add_field(Field("email", "string"))
