@@ -1,6 +1,6 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "title": "Product_DB2",
+  "title": "Product_DB5",
   "type": "object",
   "properties": {
     "idp": { "type": "integer" },
@@ -42,16 +42,26 @@
       }
     },
 
-    "stocks": {
+    "orderlines": {
       "type": "array",
       "items": {
         "type": "object",
         "properties": {
-          "idw":      { "type": "integer" },
-          "quantity": { "type": "integer" },
-          "location": { "type": "string" }
+          "idc":           { "type": "integer" },
+          "date":          { "type": "string" },
+          "quantity":      { "type": "integer" },
+          "delivery_date": { "type": "string" },
+          "comment":       { "type": "string" },
+          "grade":         { "type": "integer" }
         },
-        "required": ["idp", "idw", "quantity", "location"]
+        "required": [
+          "idc",
+          "date",
+          "quantity",
+          "delivery_date",
+          "comment",
+          "grade"
+        ]
       }
     }
   },
@@ -64,6 +74,6 @@
     "price",
     "supplier",
     "categories",
-    "stocks"
+    "orderlines"
   ]
 }
