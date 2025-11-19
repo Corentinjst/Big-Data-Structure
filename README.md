@@ -310,14 +310,14 @@ For the **Stock** collection (20 million entries):
 - Servers: 1,000
 - Avg docs/server: 20,000
 - Utilization: 100% (all servers used)
-- ✅ Good distribution
+- Good distribution
 
 **Strategy 2: Shard by IDW (Warehouse ID)**
 - Distinct values: 200 warehouses
 - Servers: 1,000
 - Avg docs/server: 20,000
 - Utilization: 20% (only 200 servers used)
-- ⚠️ Poor distribution - many idle servers
+- Poor distribution - many idle servers
 
 **Recommendation**: Shard by IDP for better server utilization
 
@@ -436,13 +436,13 @@ The project compares **5 different denormalization strategies** for an e-commerc
 ### Cardinality and Sharding
 - **Cardinality:** Number of distinct values for a field
 - **High cardinality** (e.g., Product ID: 100,000):
-  - ✅ Excellent for sharding
-  - ✅ 100% server utilization (all 1,000 servers used)
-  - ✅ Even distribution
+  - Excellent for sharding
+  - 100% server utilization (all 1,000 servers used)
+  - Even distribution
 - **Low cardinality** (e.g., Warehouse ID: 200):
-  - ⚠️ Poor for sharding
-  - ⚠️ Only 20% server utilization (only 200 of 1,000 servers used)
-  - ⚠️ Potential hotspots and imbalance
+  - Poor for sharding
+  - Only 20% server utilization (only 200 of 1,000 servers used)
+  - Potential hotspots and imbalance
 
 ## Use Cases
 
@@ -540,14 +540,14 @@ To add new functionality:
 - Avg docs/server: 20,000,000 ÷ 1,000 = **20,000 docs/server**
 - Avg distinct/server: 100,000 ÷ 1,000 = **100 distinct values/server**
 - Server utilization: **100%** (all 1,000 servers used)
-- ✅ **Excellent distribution**
+- **Excellent distribution**
 
 **Strategy 2: Shard by IDW (Warehouse ID)**
 - Distinct values: 200 warehouses
 - Avg docs/server: 20,000,000 ÷ 1,000 = **20,000 docs/server**
 - Avg distinct/server: 200 ÷ 1,000 = **0.2 distinct values/server**
 - Server utilization: **20%** (only 200 of 1,000 servers used)
-- ⚠️ **Poor distribution - 80% of servers idle**
+- **Poor distribution - 80% of servers idle**
 
 **Recommendation:** Shard by IDP for optimal distribution
 
