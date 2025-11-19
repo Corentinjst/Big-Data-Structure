@@ -1,3 +1,7 @@
+"""
+Parse Json Schema to Collection
+"""
+
 import json
 from typing import Dict, Any
 from models.schema import Schema, Field, Database, Collection
@@ -8,7 +12,19 @@ class SchemaParser:
     
     @staticmethod
     def parse_from_dict(schema_dict: Dict[str, Any], name: str = "root") -> Schema:
-        """Parse JSON Schema dictionary into Schema object"""
+        """
+        Parses a JSON Schema dictionary and converts it into an internal `Schema` object.
+
+        Args:
+            schema_dict :
+                The JSON Schema definition to convert.
+            name : 
+                The name assigned to the resulting `Schema` (useful when handling nested schemas).
+
+        Returns:
+            Schema
+                The fully constructed internal representation of the JSON Schema.
+        """
         schema = Schema(name=name)
         
         if 'properties' not in schema_dict:
@@ -59,7 +75,21 @@ class SchemaParser:
     
     @staticmethod
     def _parse_field(name: str, definition: Dict[str, Any], is_required: bool = True) -> Field:
-        """Parse a single field definition"""
+        """
+        Parses a single field from a JSON Schema and converts it into a `Field` object.
+
+        Args:
+            name : 
+                The name of the field.
+            definition : 
+                The JSON Schema definition of the field.
+            is_required : 
+                Whether this field is marked as required in the parent schema.
+
+        Returns:
+            Field
+                The fully interpreted field, including nested schemas if applicable.
+        """
         field_type = definition.get('type', 'string')
         
         # Handle nested objects

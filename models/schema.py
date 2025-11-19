@@ -7,7 +7,7 @@ from dataclasses import dataclass, field
 
 @dataclass
 class Field:
-    """Represents a single field in a schema"""
+    """Represents a field with its data type and constraints"""
     name: str
     field_type: str  # 'integer', 'string', 'date', 'longstring', 'object', 'array', etc.
     is_required: bool = True
@@ -16,7 +16,7 @@ class Field:
     
 @dataclass
 class Schema:
-    """Represents a JSON Schema for a collection"""
+    """Represents a JSON Schema with Multiple Fields"""
     name: str
     fields: List[Field] = field(default_factory=list)
     

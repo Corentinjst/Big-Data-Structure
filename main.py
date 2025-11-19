@@ -47,14 +47,14 @@ def print_db_analysis(db: Database, db_index: int,stats: Statistics,
         5: {"categories": 2,"orderLines":5}
     }
     array_sizes = avg_sizes.get(db_index)
-    print((f"Average Sizes: {array_sizes}"))
+    print((f"Average array sizes: {array_sizes}"))
     
     # Document Sizes
     print("\n### Document Sizes ###\n")
     
     for collection in db.collections.values():
         doc_size = size_calc.calculate_document_size(collection.schema, array_sizes)
-        print(f"{collection.name} document size: {doc_size:,} bytes ({doc_size/1024:.2f} KB)")
+        print(f"{collection.name} document size: {doc_size:,} bytes")
     
     # Collection Sizes
     print("\n### Collection Sizes ###\n")

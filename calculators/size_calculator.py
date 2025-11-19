@@ -38,7 +38,16 @@ class SizeCalculator:
     
     def _calculate_field_size(self, field: Field, 
                              array_sizes: Dict[str, int]) -> int:
-        """Calculate size of a single field"""
+        """
+        Compute the storage size of a single field, based on its type.
+
+        Args:
+            field: The `Field` object describing the field's type and structure.
+            array_sizes: Dictionary of expected element counts for array fields.
+
+        Returns:
+            Total byte size contributed by this field.
+        """
         
         # Add key-value overhead
         size = KEY_VALUE_OVERHEAD
@@ -116,14 +125,32 @@ class SizeCalculator:
             total_size += collection._collection_size
         
         return total_size
+    
     @staticmethod
     def bytes_to_gb(bytes_size: int) -> float:
-        """Convert bytes to gigabytes (decimal, 10^9)"""
+        """
+        Convert a byte value into gigabytes (base-10, i.e., 1 GB = 10⁹ bytes).
+
+        Args:
+            bytes_size: The size in bytes to convert.
+
+        Returns:
+            The equivalent value expressed in gigabytes.
+        """
         return bytes_size / 1_000_000_000
 
     @staticmethod
     def bytes_to_human_readable(bytes_size: int) -> str:
-        """Convert bytes to human-readable format (decimal units)"""
+        """
+        Convert a byte value into a human-readable string using decimal units.
+        The method selects the most appropriate unit among: B, KB, MB, GB, TB.
+
+        Args:
+            bytes_size: The size in bytes to convert.
+
+        Returns:
+            A formatted string representing the size in human-readable units.
+        """
         units = [
             ('B', 1),
             ('KB', 1_000),
