@@ -24,7 +24,8 @@
         "type": "integer"
       },
       "address": {
-        "type": "string"
+        "type": "string",
+        "format": "longstring"
       },
       "capacity": {
         "type": "integer"
@@ -53,7 +54,8 @@
         "format": "date"
       },
       "comment": {
-        "type": "string"
+        "type": "string",
+        "format": "longstring"
       },
       "grade": {
         "type": "integer"
@@ -71,7 +73,8 @@
             "type": "string"
           },
           "description": {
-            "type": "string"
+            "type": "string",
+            "format": "longstring"
           },
           "image_url": {
             "type": "string"
@@ -112,9 +115,6 @@
               "name": {
                 "type": "string"
               },
-              "SIRET": {
-                "type": "string"
-              },
               "headOffice": {
                 "type": "string"
               },
@@ -122,7 +122,7 @@
                 "type": "integer"
               }
             },
-            "required": ["IDS", "name", "SIRET", "headOffice", "revenue"]
+            "required": ["IDS", "name", "headOffice", "revenue"]
           }
         },
         "required": ["IDP", "name", "brand", "description", "image_url", "price", "categories", "supplier"]
@@ -143,7 +143,8 @@
         "type": "string"
       },
       "address": {
-        "type": "string"
+        "type": "string",
+        "format": "longstring"
       },
       "nationality": {
         "type": "string"

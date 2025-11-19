@@ -1,146 +1,213 @@
 """
-Main program to demonstrate the calculations
+Main program to demonstrate the calculations using JSON schema parser
+Analyzes all 5 database designs (DB1-DB5) with different denormalization strategies
 """
 
-import json
-from models.schema import Schema, Field, Database
-from models.collection import Collection
+from typing import Dict, Optional
+from models.schema import Schema, Field, Database, Collection
 from models.statistics import Statistics
 from parsers.schema_parser import SchemaParser
 from calculators.size_calculator import SizeCalculator
 from calculators.shard_calculator import ShardCalculator
 
-def create_product_schema() -> Schema:
-    """Create Product schema programmatically"""
-    schema = Schema("Product")
-    
-    # Basic fields
-    schema.add_field(Field("IDP", "integer"))
-    schema.add_field(Field("name", "string"))
-    schema.add_field(Field("brand", "string"))
-    schema.add_field(Field("description", "string")) #changed from longstring to string because of the correction
-    schema.add_field(Field("image_url", "string"))
-    
-    # Price nested object
-    price_schema = Schema("price")
-    price_schema.add_field(Field("amount", "number"))
-    price_schema.add_field(Field("currency", "string"))
-    price_schema.add_field(Field("vat_rate", "number"))
-    schema.add_field(Field("price", "object", nested_schema=price_schema))
-    
-    # Categories array
-    cat_schema = Schema("category")
-    cat_schema.add_field(Field("title", "string"))
-    schema.add_field(Field("categories", "array", array_item_schema=cat_schema))
-    
-    # Supplier nested object
-    supp_schema = Schema("supplier")
-    supp_schema.add_field(Field("IDS", "integer"))
-    supp_schema.add_field(Field("name", "string"))
-    # drop pour DB1 supp_schema.add_field(Field("SIRET", "string"))
-    # drop pour DB1 supp_schema.add_field(Field("headOffice", "string"))
-    supp_schema.add_field(Field("revenue", "integer"))
-    schema.add_field(Field("supplier", "object", nested_schema=supp_schema))
-    
-    return schema
 
-def create_stock_schema() -> Schema:
-    """Create Stock schema"""
-    schema = Schema("Stock")
-    schema.add_field(Field("IDP", "integer"))
-    schema.add_field(Field("IDW", "integer"))
-    schema.add_field(Field("quantity", "integer"))
-    schema.add_field(Field("location", "string"))
-    return schema
-
-def create_warehouse_schema() -> Schema:
-    """Create Warehouse schema"""
-    schema = Schema("Warehouse")
-    schema.add_field(Field("IDW", "integer"))
-    schema.add_field(Field("address", "string"))
-    schema.add_field(Field("capacity", "integer"))
-    return schema
-
-def create_orderline_schema() -> Schema:
-    """Create OrderLine schema"""
-    schema = Schema("OrderLine")
-    schema.add_field(Field("IDC", "integer"))
-    schema.add_field(Field("IDP", "integer"))
-    schema.add_field(Field("date", "date"))
-    schema.add_field(Field("quantity", "integer"))
-    schema.add_field(Field("deliveryDate", "date"))
-    schema.add_field(Field("comment", "longstring"))
-    schema.add_field(Field("grade", "integer"))
-    return schema
-
-def create_client_schema() -> Schema:
-    """Create Client schema"""
-    schema = Schema("Client")
-    schema.add_field(Field("IDC", "integer"))
-    schema.add_field(Field("ln", "string"))
-    schema.add_field(Field("fn", "string"))
-    schema.add_field(Field("address", "string")) #changed from longstring to string because of the correction
-    schema.add_field(Field("nationality", "string"))
-    schema.add_field(Field("birthDate", "date"))
-    schema.add_field(Field("email", "string"))
-    return schema
-
-def create_db1(stats: Statistics) -> Database:
-    """Create DB1: Prod{[Cat],Supp}, St, Wa, OL, Cl"""
-    db = Database("DB1")
+def build_db_from_json(db_index: int, stats: Statistics) -> Database:
+    """
+    Build a Database instance by loading schemas from JSON file
     
-    # Product collection
-    prod_schema = create_product_schema()
-    prod_collection = Collection(
-        name="Product",
-        schema=prod_schema,
-        document_count=stats.num_products
-    )
-    db.add_collection(prod_collection)
+    Args:
+        db_index: Database index (1-5)
+        stats: Statistics instance
     
-    # Stock collection
-    stock_schema = create_stock_schema()
-    stock_collection = Collection(
-        name="Stock",
-        schema=stock_schema,
-        document_count=stats.num_stock_entries
-    )
-    db.add_collection(stock_collection)
+    Returns:
+        Database instance with all collections
+    """
+    db = Database(f"DB{db_index}")
     
-    # Warehouse collection
-    warehouse_schema = create_warehouse_schema()
-    warehouse_collection = Collection(
-        name="Warehouse",
-        schema=warehouse_schema,
-        document_count=stats.num_warehouses
-    )
-    db.add_collection(warehouse_collection)
+    # Load all schemas from the corresponding JSON file
+    schemas = SchemaParser.parse_multiple_from_file(f"schemas/db{db_index}.json")
     
-    # OrderLine collection
-    ol_schema = create_orderline_schema()
-    ol_collection = Collection(
-        name="OrderLine",
-        schema=ol_schema,
-        document_count=stats.num_order_lines
-    )
-    db.add_collection(ol_collection)
+    # Map collection names to document counts
+    collection_counts = {
+        "Product": stats.num_products,
+        "Stock": stats.num_stock_entries,
+        "Warehouse": stats.num_warehouses,
+        "OrderLine": stats.num_order_lines,
+        "Client": stats.num_clients
+    }
     
-    # Client collection
-    client_schema = create_client_schema()
-    client_collection = Collection(
-        name="Client",
-        schema=client_schema,
-        document_count=stats.num_clients
-    )
-    db.add_collection(client_collection)
+    # Create collections for each schema in the JSON file
+    for schema_name, schema in schemas.items():
+        # Extract collection name from schema name (e.g., "Product_DB1" -> "Product")
+        collection_name = schema_name.rsplit('_', 1)[0]
+        
+        # Get the appropriate document count
+        document_count = collection_counts.get(collection_name, 0)
+        
+        # Create and add collection
+        collection = Collection(
+            name=collection_name,
+            schema=schema,
+            document_count=document_count
+        )
+        db.add_collection(collection)
     
     return db
 
+
+def get_array_sizes_for_collection(collection_name: str, stats: Statistics) -> Dict[str, int]:
+    """
+    Get appropriate array sizes for a collection's embedded arrays
+    
+    Args:
+        collection_name: Name of the collection
+        stats: Statistics instance
+    
+    Returns:
+        Dictionary of array field names to their average sizes
+    """
+    array_sizes = {}
+    
+    if collection_name == "Product":
+        array_sizes['categories'] = 2  # Average 2 categories per product
+    """
+    elif collection_name == "Stock":
+        array_sizes['categories'] = 2  # For embedded product categories in DB3
+    elif collection_name == "OrderLine":
+        array_sizes['categories'] = 2  # For embedded product categories in DB4
+    
+    return array_sizes
+    """
+
+
+def print_db_analysis(db: Database, db_index: int, stats: Statistics, 
+                     size_calc: SizeCalculator, shard_calc: ShardCalculator):
+    """
+    Print complete analysis for a database including sizes and sharding
+    
+    Args:
+        db: Database instance to analyze
+        db_index: Database index (1-5)
+        stats: Statistics instance
+        size_calc: SizeCalculator instance
+        shard_calc: ShardCalculator instance
+    """
+    print("\n" + "=" * 60)
+    print(f"Analysis for DB{db_index} (JSON)")
+    print("=" * 60)
+    
+    # Get denormalization signature
+    signatures = {
+        1: "Prod{[Cat],Supp}, St, Wa, OL, Cl (Normalized)",
+        2: "Prod{[Cat], Supp, [St]}, Wa, OL, Cl",
+        3: "St{Prod{[Cat], Supp}}, Wa, OL, Cl",
+        4: "St, Wa, OL{Prod{[Cat], Supp}}, Cl",
+        5: "Prod{[Cat], Supp, [OL]}, St, Wa, Cl"
+    }
+    print(f"Signature: {signatures.get(db_index, 'Unknown')}")
+    
+    # Document Sizes
+    print("\n### Document Sizes ###\n")
+    
+    for collection in db.collections.values():
+        # Get array sizes for this collection
+        array_sizes = get_array_sizes_for_collection(collection.name, stats)
+        
+        # Special handling for embedded arrays
+        if db_index == 2 and collection.name == "Product":
+            array_sizes['stocks'] = stats.num_warehouses  # DB2: Product embeds stocks
+        elif db_index == 5 and collection.name == "Product":
+            array_sizes['orderLines'] = stats.orders_per_customer  # DB5: Product embeds orderlines
+        
+        doc_size = size_calc.calculate_document_size(collection.schema, array_sizes)
+        print(f"{collection.name} document size: {doc_size:,} bytes ({doc_size/1024:.2f} KB)")
+    
+    # Collection Sizes
+    print("\n### Collection Sizes ###\n")
+    
+    for collection in db.collections.values():
+        # Get array sizes for this collection
+        array_sizes = get_array_sizes_for_collection(collection.name, stats)
+        
+        # Special handling for embedded arrays
+        if db_index == 2 and collection.name == "Product":
+            array_sizes['stocks'] = stats.num_warehouses
+        elif db_index == 5 and collection.name == "Product":
+            array_sizes['orderLines'] = stats.orders_per_customer
+        
+        coll_size = size_calc.calculate_collection_size(collection, array_sizes)
+        print(f"{collection.name} collection: {size_calc.bytes_to_human_readable(coll_size)}")
+    
+    # Database Size
+    print("\n### Database Size ###\n")
+    db_size = size_calc.calculate_database_size(db)
+    print(f"DB{db_index} total size: {size_calc.bytes_to_human_readable(db_size)}")
+    print(f"DB{db_index} total size: {size_calc.bytes_to_gb(db_size):.2f} GB")
+    
+    # Sharding Analysis
+    print("\n### Sharding Analysis ###\n")
+    
+    # Stock collection sharding (if present)
+    stock_collection = db.get_collection("Stock")
+    if stock_collection:
+        print("Stock Collection Sharding:\n")
+        stock_strategies = {
+            'IDP': stats.num_products,
+            'IDW': stats.num_warehouses
+        }
+        stock_results = shard_calc.compare_sharding_strategies(
+            stock_collection,
+            stock_strategies
+        )
+        
+        for key, metrics in stock_results.items():
+            print(f"\nSharding by {key}:")
+            print(f"  Avg docs/server: {metrics['avg_docs_per_server']:,.0f}")
+            print(f"  Avg distinct values/server: {metrics['avg_distinct_per_server']:.1f}")
+            print(f"  Server utilization: {metrics['server_utilization']*100:.1f}%")
+    
+    # OrderLine collection sharding (if present)
+    ol_collection = db.get_collection("OrderLine")
+    if ol_collection:
+        print("\n\nOrderLine Collection Sharding:\n")
+        ol_strategies = {
+            'IDC': stats.num_clients,
+            'IDP': stats.num_products
+        }
+        ol_results = shard_calc.compare_sharding_strategies(
+            ol_collection,
+            ol_strategies
+        )
+        
+        for key, metrics in ol_results.items():
+            print(f"\nSharding by {key}:")
+            print(f"  Avg docs/server: {metrics['avg_docs_per_server']:,.0f}")
+            print(f"  Avg distinct values/server: {metrics['avg_distinct_per_server']:,.0f}")
+            print(f"  Server utilization: {metrics['server_utilization']*100:.1f}%")
+    
+    # Product collection sharding (if present)
+    prod_collection = db.get_collection("Product")
+    if prod_collection:
+        print("\n\nProduct Collection Sharding:\n")
+        prod_strategies = {
+            'IDP': stats.num_products,
+            'brand': stats.num_brands
+        }
+        prod_results = shard_calc.compare_sharding_strategies(
+            prod_collection,
+            prod_strategies
+        )
+        
+        for key, metrics in prod_results.items():
+            print(f"\nSharding by {key}:")
+            print(f"  Avg docs/server: {metrics['avg_docs_per_server']:,.1f}")
+            print(f"  Avg distinct values/server: {metrics['avg_distinct_per_server']:.1f}")
+            print(f"  Server utilization: {metrics['server_utilization']*100:.1f}%")
+    
+
+
 def main():
-    """Main execution"""
-    print("=" * 60)
-    print("Chapter 2 Homework - NoSQL Database Analysis")
-    print("=" * 60)
+    """Main execution - analyze all 5 database designs"""
     
     # Initialize statistics
     stats = Statistics()
@@ -149,116 +216,26 @@ def main():
     size_calc = SizeCalculator(stats)
     shard_calc = ShardCalculator(stats)
     
-    # Create DB1
-    db1 = create_db1(stats)
+    # Demander à l'utilisateur de choisir une base de données
+    while True:
+        try:
+            db_choice = int(input("\nEntrez un numéro de base de données (1-5) ou 0 pour analyser toutes : "))
+            if 0 <= db_choice <= 5:
+                break
+            else:
+                print("Veuillez entrer un nombre entre 0 et 5.")
+        except ValueError:
+            print("Entrée invalide. Veuillez entrer un nombre.")
     
-    print("\n### Document Sizes ###\n")
-    
-    # Calculate Product document size
-    prod_collection = db1.get_collection("Product")
-    prod_doc_size = size_calc.calculate_document_size(
-        prod_collection.schema,
-        array_sizes={'categories': 2}  # Avg 2 categories
-    )
-    print(f"Product document size: {prod_doc_size} bytes ({prod_doc_size/1024:.2f} KB)")
-    
-    # Calculate Stock document size
-    stock_collection = db1.get_collection("Stock")
-    stock_doc_size = size_calc.calculate_document_size(stock_collection.schema)
-    print(f"Stock document size: {stock_doc_size} bytes")
-    
-    # Calculate all collection sizes
-    print("\n### Collection Sizes ###\n")
-    
-    # Product
-    prod_size = size_calc.calculate_collection_size(
-        prod_collection,
-        array_sizes={'categories': 2}
-    )
-    print(f"Product collection: {size_calc.bytes_to_human_readable(prod_size)}")
-    
-    # Stock
-    stock_size = size_calc.calculate_collection_size(stock_collection)
-    print(f"Stock collection: {size_calc.bytes_to_human_readable(stock_size)}")
-    
-    # Warehouse
-    warehouse_collection = db1.get_collection("Warehouse")
-    warehouse_size = size_calc.calculate_collection_size(warehouse_collection)
-    print(f"Warehouse collection: {size_calc.bytes_to_human_readable(warehouse_size)}")
-    
-    # OrderLine
-    ol_collection = db1.get_collection("OrderLine")
-    ol_size = size_calc.calculate_collection_size(ol_collection)
-    print(f"OrderLine collection: {size_calc.bytes_to_human_readable(ol_size)}")
-    
-    # Client
-    client_collection = db1.get_collection("Client")
-    client_size = size_calc.calculate_collection_size(client_collection)
-    print(f"Client collection: {size_calc.bytes_to_human_readable(client_size)}")
-    
-    # Database size
-    print("\n### Database Size ###\n")
-    db_size = size_calc.calculate_database_size(db1)
-    print(f"DB1 total size: {size_calc.bytes_to_human_readable(db_size)}")
-    print(f"DB1 total size: {size_calc.bytes_to_gb(db_size):.2f} GB")
-    
-    # Sharding analysis
-    print("\n### Sharding Analysis ###\n")
-    
-    # Stock sharding strategies
-    print("Stock Collection Sharding:\n")
-    stock_strategies = {
-        'IDP': stats.num_products,
-        'IDW': stats.num_warehouses
-    }
-    stock_results = shard_calc.compare_sharding_strategies(
-        stock_collection,
-        stock_strategies
-    )
-    
-    for key, metrics in stock_results.items():
-        print(f"\nSharding by {key}:")
-        print(f"  Avg docs/server: {metrics['avg_docs_per_server']:,.0f}")
-        print(f"  Avg distinct values/server: {metrics['avg_distinct_per_server']:.1f}")
-        print(f"  Server utilization: {metrics['server_utilization']*100:.1f}%")
-        if metrics['skew_warning']:
-            print(f"  ⚠️  Warning: Low server utilization!")
-    
-    # OrderLine sharding strategies
-    print("\n\nOrderLine Collection Sharding:\n")
-    ol_strategies = {
-        'IDC': stats.num_clients,
-        'IDP': stats.num_products
-    }
-    ol_results = shard_calc.compare_sharding_strategies(
-        ol_collection,
-        ol_strategies
-    )
-    
-    for key, metrics in ol_results.items():
-        print(f"\nSharding by {key}:")
-        print(f"  Avg docs/server: {metrics['avg_docs_per_server']:,.0f}")
-        print(f"  Avg distinct values/server: {metrics['avg_distinct_per_server']:,.0f}")
-        print(f"  Server utilization: {metrics['server_utilization']*100:.1f}%")
-    
-    # Product sharding strategies
-    print("\n\nProduct Collection Sharding:\n")
-    prod_strategies = {
-        'IDP': stats.num_products,
-        'brand': stats.num_brands
-    }
-    prod_results = shard_calc.compare_sharding_strategies(
-        prod_collection,
-        prod_strategies
-    )
-    
-    for key, metrics in prod_results.items():
-        print(f"\nSharding by {key}:")
-        print(f"  Avg docs/server: {metrics['avg_docs_per_server']:,.1f}")
-        print(f"  Avg distinct values/server: {metrics['avg_distinct_per_server']:.1f}")
-        print(f"  Server utilization: {metrics['server_utilization']*100:.1f}%")
-    
-    print("\n" + "=" * 60)
+    if db_choice == 0:
+        # Analyser toutes les bases de données
+        for i in range(1, 6):
+            db = build_db_from_json(i, stats)
+            print_db_analysis(db, i, stats, size_calc, shard_calc)
+    else:
+        # Analyser la base de données choisie
+        db = build_db_from_json(db_choice, stats)
+        print_db_analysis(db, db_choice, stats, size_calc, shard_calc)
 
 if __name__ == "__main__":
     main()

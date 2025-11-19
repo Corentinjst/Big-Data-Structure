@@ -3,7 +3,7 @@ Calculate sharding distribution statistics
 """
 
 from typing import Dict, Tuple
-from models.collection import Collection
+from models.schema import Collection
 from models.statistics import Statistics
 
 class ShardCalculator:
@@ -77,42 +77,4 @@ class ShardCalculator:
         
         return results
     
-    def recommend_sharding_key(self, 
-                              collection: Collection,
-                              strategies: Dict[str, int]) -> str:
-        """
-        Recommend the best sharding key based on distribution
-        
-        Args:
-            collection: The collection to analyze
-            strategies: Dict mapping sharding_key -> distinct_values
-        
-        Returns:
-            Recommended sharding key
-        """
-        results = self.compare_sharding_strategies(collection, strategies)
-        
-        # Score each strategy
-        # Good sharding has:
-        # 1. High server utilization
-        # 2. Reasonable docs per server
-        # 3. Good distinct value distribution
-        
-        best_key = None
-        best_score = -1
-        
-        for key, metrics in results.items():
-            # Penalize low utilization
-            utilization_score = metrics['server_utilization']
-            
-            # Prefer more distinct values per server (but not too many)
-            distinct_score = min(metrics['avg_distinct_per_server'] / 10, 1.0)
-            
-            # Combined score
-            score = utilization_score * 0.7 + distinct_score * 0.3
-            
-            if score > best_score:
-                best_score = score
-                best_key = key
-        
-        return best_key
+    

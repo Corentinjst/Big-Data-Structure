@@ -16,8 +16,7 @@ The tool models an e-commerce database system and provides:
 ```
 Big-Data-Structure/
 ├── models/              # Data models for schemas, collections, and databases
-│   ├── schema.py        # Schema and Field definitions
-│   ├── collection.py    # Collection metadata
+│   ├── schema.py        # Schema, Field, and Collections definitions
 │   └── statistics.py    # Database statistics
 ├── parsers/             # Parse JSON schemas
 │   └── schema_parser.py # JSON Schema parser
@@ -27,7 +26,8 @@ Big-Data-Structure/
 ├── config/              # Configuration constants
 │   └── constants.py     # Data type size constants
 ├── tests/               # Test suite
-└── main.py             # Main demo program
+│   └── TD1.ipynb        # Test on Jupyter for TD1
+└── main.py              # Main demo program
 ```
 
 ## Core Components

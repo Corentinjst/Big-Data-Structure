@@ -3,8 +3,7 @@ Calculate sizes of documents, collections, and databases
 """
 
 from typing import Dict, Optional
-from models.schema import Schema, Field
-from models.collection import Collection
+from models.schema import Schema, Field, Collection
 from models.statistics import Statistics
 from config.constants import *
 
