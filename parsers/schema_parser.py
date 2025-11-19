@@ -1,28 +1,10 @@
-"""
-Parse JSON Schema files into internal representation (Version 2)
-
-Changes from schema_parser.py:
-- Does NOT auto-convert fields to "longstring" based on field name
-- Respects JSON "type" field exactly as written
-- Converts to "date" or "longstring" only if JSON explicitly contains
-  "format": "date" or "format": "longstring"
-- Supports nested objects and arrays as before
-- New function parse_multiple_from_file() for multi-schema JSON files
-"""
-
 import json
 from typing import Dict, Any
-from models.schema import Schema, Field
+from models.schema import Schema, Field, Database, Collection
+from models.statistics import Statistics
 
 class SchemaParser:
     """Parse JSON Schema into internal Schema objects (strict version)"""
-    
-    @staticmethod
-    def parse_from_file(filepath: str) -> Schema:
-        """Load and parse JSON Schema from file"""
-        with open(filepath, 'r') as f:
-            schema_dict = json.load(f)
-        return SchemaParser.parse_from_dict(schema_dict)
     
     @staticmethod
     def parse_from_dict(schema_dict: Dict[str, Any], name: str = "root") -> Schema:
@@ -118,3 +100,47 @@ class SchemaParser:
                 field_type=field_type,
                 is_required=is_required
             )
+
+    @staticmethod
+    def build_db_from_json(db_index: int, stats: Statistics) -> Database:
+        """
+        Build a Database instance by loading schemas from JSON file
+        
+        Args:
+            db_index: Database index (1-5)
+            stats: Statistics instance
+        
+        Returns:
+            Database instance with all collections
+        """
+        db = Database(f"DB{db_index}")
+        
+        # Load all schemas from the corresponding JSON file
+        schemas = SchemaParser.parse_multiple_from_file(f"../schemas/db{db_index}.json")
+        
+        # Map collection names to document counts
+        collection_counts = {
+            "Product": stats.num_products,
+            "Stock": stats.num_stock_entries,
+            "Warehouse": stats.num_warehouses,
+            "OrderLine": stats.num_order_lines,
+            "Client": stats.num_clients
+        }
+        
+        # Create collections for each schema in the JSON file
+        for schema_name, schema in schemas.items():
+            # Extract collection name from schema name (e.g., "Product_DB1" -> "Product")
+            collection_name = schema_name.rsplit('_', 1)[0]
+            
+            # Get the appropriate document count
+            document_count = collection_counts.get(collection_name, 0)
+            
+            # Create and add collection
+            collection = Collection(
+                name=collection_name,
+                schema=schema,
+                document_count=document_count
+            )
+            db.add_collection(collection)
+        
+        return db

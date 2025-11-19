@@ -11,50 +11,6 @@ from calculators.size_calculator import SizeCalculator
 from calculators.shard_calculator import ShardCalculator
 
 
-def build_db_from_json(db_index: int, stats: Statistics) -> Database:
-    """
-    Build a Database instance by loading schemas from JSON file
-    
-    Args:
-        db_index: Database index (1-5)
-        stats: Statistics instance
-    
-    Returns:
-        Database instance with all collections
-    """
-    db = Database(f"DB{db_index}")
-    
-    # Load all schemas from the corresponding JSON file
-    schemas = SchemaParser.parse_multiple_from_file(f"schemas/db{db_index}.json")
-    
-    # Map collection names to document counts
-    collection_counts = {
-        "Product": stats.num_products,
-        "Stock": stats.num_stock_entries,
-        "Warehouse": stats.num_warehouses,
-        "OrderLine": stats.num_order_lines,
-        "Client": stats.num_clients
-    }
-    
-    # Create collections for each schema in the JSON file
-    for schema_name, schema in schemas.items():
-        # Extract collection name from schema name (e.g., "Product_DB1" -> "Product")
-        collection_name = schema_name.rsplit('_', 1)[0]
-        
-        # Get the appropriate document count
-        document_count = collection_counts.get(collection_name, 0)
-        
-        # Create and add collection
-        collection = Collection(
-            name=collection_name,
-            schema=schema,
-            document_count=document_count
-        )
-        db.add_collection(collection)
-    
-    return db
-
-
 def get_array_sizes_for_collection(collection_name: str, stats: Statistics) -> Dict[str, int]:
     """
     Get appropriate array sizes for a collection's embedded arrays
@@ -230,11 +186,11 @@ def main():
     if db_choice == 0:
         # Analyser toutes les bases de données
         for i in range(1, 6):
-            db = build_db_from_json(i, stats)
+            db = SchemaParser.build_db_from_json(i, stats)
             print_db_analysis(db, i, stats, size_calc, shard_calc)
     else:
         # Analyser la base de données choisie
-        db = build_db_from_json(db_choice, stats)
+        db = SchemaParser.build_db_from_json(db_choice, stats)
         print_db_analysis(db, db_choice, stats, size_calc, shard_calc)
 
 if __name__ == "__main__":
