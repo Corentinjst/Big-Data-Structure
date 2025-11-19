@@ -116,24 +116,6 @@ class SizeCalculator:
             total_size += collection._collection_size
         
         return total_size
-    '''
-    This was the original implementation using binary units (1024-based) GiB. However,
-    we changed to decimal (1000-based)GB for consistency with the TP.
-    
-    @staticmethod
-    def bytes_to_gb(bytes_size: int) -> float:
-        """Convert bytes to gigabytes"""
-        return bytes_size / (1024 ** 3)
-    
-    @staticmethod
-    def bytes_to_human_readable(bytes_size: int) -> str:
-        """Convert bytes to human-readable format"""
-        for unit in ['B', 'KB', 'MB', 'GB', 'TB']:
-            if bytes_size < 1024.0:
-                return f"{bytes_size:.2f} {unit}"
-            bytes_size /= 1024.0
-        return f"{bytes_size:.2f} PB"
-    '''
     @staticmethod
     def bytes_to_gb(bytes_size: int) -> float:
         """Convert bytes to gigabytes (decimal, 10^9)"""

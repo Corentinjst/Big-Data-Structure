@@ -102,7 +102,7 @@ class SchemaParser:
             )
 
     @staticmethod
-    def build_db_from_json(db_index: int, stats: Statistics) -> Database:
+    def build_db_from_json(db_index: int, stats: Statistics, file_path: str) -> Database:
         """
         Build a Database instance by loading schemas from JSON file
         
@@ -116,7 +116,7 @@ class SchemaParser:
         db = Database(f"DB{db_index}")
         
         # Load all schemas from the corresponding JSON file
-        schemas = SchemaParser.parse_multiple_from_file(f"../schemas/db{db_index}.json")
+        schemas = SchemaParser.parse_multiple_from_file(file_path)
         
         # Map collection names to document counts
         collection_counts = {
