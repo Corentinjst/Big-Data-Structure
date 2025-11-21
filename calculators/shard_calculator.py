@@ -30,12 +30,15 @@ class ShardCalculator:
         num_servers = self.stats.num_servers
         total_docs = collection.document_count
         
+        if(distinct_values<num_servers):
+            num_servers = distinct_values
+            
+        # Average distinct values per server
+        avg_distinct_per_server = distinct_values / num_servers            
+
         # Average documents per server
         avg_docs_per_server = total_docs / num_servers
         
-        # Average distinct values per server
-        # Note: This assumes uniform distribution
-        avg_distinct_per_server = distinct_values / num_servers
         
         # Check for under-utilization (fewer distinct values than servers)
         servers_with_data = min(distinct_values, num_servers)
