@@ -18,3 +18,18 @@ TYPE_SIZES = {
     'date': DATE_SIZE,
     'longstring': LONG_STRING_SIZE
 }
+
+# Network and query execution constants
+BANDWIDTH_SPEED = 1_000_000_000  # 1 Gbps = 1,000,000,000 bits/s = 125,000,000 bytes/s
+BANDWIDTH_SPEED_BYTES_PER_MS = BANDWIDTH_SPEED / 1000  # bytes per millisecond
+
+# Cost constants
+COST_PER_GB_TRANSFER = 0.01  # USD per GB transferred
+CARBON_PER_GB_TRANSFER = 0.5  # gCO2 per GB transferred (approximate)
+COST_PER_SERVER_MS = 0.0001  # USD per server millisecond
+CARBON_PER_SERVER_MS = 0.001  # gCO2 per server millisecond
+
+# Query execution constants
+INDEX_ACCESS_TIME_MS = 0.1  # milliseconds per index access
+FULL_SCAN_TIME_PER_DOC_MS = 0.001  # milliseconds per document in full scan
+COMPARISON_TIME_MS = 0.0001  # milliseconds per comparison operation

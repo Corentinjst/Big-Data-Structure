@@ -1,0 +1,291 @@
+"""
+Query executor for running predefined queries (Q1-Q7)
+Demonstrates usage of filter and join operators
+"""
+
+from typing import Dict, Optional, List, Tuple
+from models.schema import Database
+from models.statistics import Statistics
+from .filter_operator import FilterOperator, FilterResult
+from .join_operator import NestedLoopJoinOperator, JoinResult
+
+
+class QueryExecutor:
+    """
+    Executes predefined queries on different database designs
+    """
+
+    def __init__(self, database: Database, statistics: Statistics):
+        """
+        Initialize query executor
+
+        Args:
+            database: Database to query
+            statistics: Database statistics
+        """
+        self.database = database
+        self.statistics = statistics
+        self.filter_op = FilterOperator(statistics)
+        self.join_op = NestedLoopJoinOperator(statistics)
+
+    def execute_q1(
+        self,
+        idp_value: int,
+        idw_value: int,
+        sharding_strategy: Dict[str, str],
+        array_sizes: Optional[Dict[str, int]] = None
+    ) -> FilterResult:
+        """
+        Q1: The stock of a given ID product in a given warehouse
+        SELECT S.quantity, S.location
+        FROM Stock S
+        WHERE S.IDP = $IDP AND S.IDW = $IDW
+
+        Args:
+            idp_value: Product ID value
+            idw_value: Warehouse ID value
+            sharding_strategy: Dict mapping collection names to sharding keys
+            array_sizes: Average array sizes
+
+        Returns:
+            FilterResult
+        """
+        stock_collection = self.database.get_collection("Stock")
+        if not stock_collection:
+            raise ValueError("Stock collection not found")
+
+        sharding_key = sharding_strategy.get("Stock")
+        output_keys = ["quantity", "location"]
+
+        # Very selective - looking for exact match
+        selectivity = 1 / stock_collection.document_count
+
+        return self.filter_op.execute_filter(
+            collection=stock_collection,
+            filter_key="IDP",  # Filtering on IDP first
+            output_keys=output_keys,
+            sharding_key=sharding_key,
+            selectivity=selectivity,
+            use_index=True,
+            array_sizes=array_sizes
+        )
+
+    def execute_q2(
+        self,
+        brand: str,
+        sharding_strategy: Dict[str, str],
+        array_sizes: Optional[Dict[str, int]] = None
+    ) -> FilterResult:
+        """
+        Q2: Names and prices of product from a given brand (e.g., "Apple")
+        SELECT P.name, P.price
+        FROM Product P
+        WHERE P.brand = $brand
+
+        Args:
+            brand: Brand name (e.g., "Apple")
+            sharding_strategy: Dict mapping collection names to sharding keys
+            array_sizes: Average array sizes
+
+        Returns:
+            FilterResult
+        """
+        product_collection = self.database.get_collection("Product")
+        if not product_collection:
+            raise ValueError("Product collection not found")
+
+        sharding_key = sharding_strategy.get("Product")
+        output_keys = ["name", "price"]
+
+        # For Apple brand: 50 products out of 100,000
+        if brand.lower() == "apple":
+            selectivity = self.statistics.products_per_brand_apple / self.statistics.num_products
+        else:
+            # Average selectivity for a brand
+            selectivity = 1 / self.statistics.num_brands
+
+        return self.filter_op.execute_filter(
+            collection=product_collection,
+            filter_key="brand",
+            output_keys=output_keys,
+            sharding_key=sharding_key,
+            selectivity=selectivity,
+            use_index=True,
+            array_sizes=array_sizes
+        )
+
+    def execute_q3(
+        self,
+        date: str,
+        sharding_strategy: Dict[str, str],
+        array_sizes: Optional[Dict[str, int]] = None
+    ) -> FilterResult:
+        """
+        Q3: Product ID and quantity from order lines ordered at a given date
+        SELECT O.IDP, O.quantity
+        FROM OrderLine O
+        WHERE O.date = $date
+
+        Args:
+            date: Order date
+            sharding_strategy: Dict mapping collection names to sharding keys
+            array_sizes: Average array sizes
+
+        Returns:
+            FilterResult
+        """
+        orderline_collection = self.database.get_collection("OrderLine")
+        if not orderline_collection:
+            raise ValueError("OrderLine collection not found")
+
+        sharding_key = sharding_strategy.get("OrderLine")
+        output_keys = ["IDP", "quantity"]
+
+        # Orders balanced over 365 dates
+        selectivity = 1 / self.statistics.num_dates
+
+        return self.filter_op.execute_filter(
+            collection=orderline_collection,
+            filter_key="date",
+            output_keys=output_keys,
+            sharding_key=sharding_key,
+            selectivity=selectivity,
+            use_index=False,
+            array_sizes=array_sizes
+        )
+
+    def execute_q4(
+        self,
+        idw_value: int,
+        sharding_strategy: Dict[str, str],
+        array_sizes: Optional[Dict[str, int]] = None
+    ) -> JoinResult:
+        """
+        Q4: Stock (list of product names, as well as their quantity) from a given warehouse
+        SELECT P.name, S.quantity
+        FROM Stock S JOIN Product P ON S.IDP = P.IDP
+        WHERE S.IDW = $IDW
+
+        Args:
+            idw_value: Warehouse ID value
+            sharding_strategy: Dict mapping collection names to sharding keys
+            array_sizes: Average array sizes
+
+        Returns:
+            JoinResult
+        """
+        stock_collection = self.database.get_collection("Stock")
+        product_collection = self.database.get_collection("Product")
+
+        if not stock_collection or not product_collection:
+            raise ValueError("Required collections not found")
+
+        stock_sharding = sharding_strategy.get("Stock")
+        product_sharding = sharding_strategy.get("Product")
+
+        output_keys = ["name", "quantity"]
+
+        # Filter selectivity: 1 warehouse out of 200
+        filter_selectivity = 1 / self.statistics.num_warehouses
+
+        return self.join_op.execute_join(
+            left_collection=stock_collection,
+            right_collection=product_collection,
+            join_key="IDP",
+            output_keys=output_keys,
+            left_sharding_key=stock_sharding,
+            right_sharding_key=product_sharding,
+            left_filter_key="IDW",
+            left_filter_selectivity=filter_selectivity,
+            array_sizes=array_sizes
+        )
+
+    def execute_q5(
+        self,
+        brand: str,
+        sharding_strategy: Dict[str, str],
+        array_sizes: Optional[Dict[str, int]] = None
+    ) -> JoinResult:
+        """
+        Q5: Distribution of "Apple" brand products (name & price) in warehouses (IDW & quantity)
+        SELECT P.name, P.price, S.IDW, S.quantity
+        FROM Product P JOIN Stock S ON P.IDP = S.IDP
+        WHERE P.brand = "Apple"
+
+        Args:
+            brand: Brand name (e.g., "Apple")
+            sharding_strategy: Dict mapping collection names to sharding keys
+            array_sizes: Average array sizes
+
+        Returns:
+            JoinResult
+        """
+        product_collection = self.database.get_collection("Product")
+        stock_collection = self.database.get_collection("Stock")
+
+        if not product_collection or not stock_collection:
+            raise ValueError("Required collections not found")
+
+        product_sharding = sharding_strategy.get("Product")
+        stock_sharding = sharding_strategy.get("Stock")
+
+        output_keys = ["name", "price", "IDW", "quantity"]
+
+        # Filter selectivity for Apple brand
+        if brand.lower() == "apple":
+            filter_selectivity = self.statistics.products_per_brand_apple / self.statistics.num_products
+        else:
+            filter_selectivity = 1 / self.statistics.num_brands
+
+        return self.join_op.execute_join(
+            left_collection=product_collection,
+            right_collection=stock_collection,
+            join_key="IDP",
+            output_keys=output_keys,
+            left_sharding_key=product_sharding,
+            right_sharding_key=stock_sharding,
+            left_filter_key="brand",
+            left_filter_selectivity=filter_selectivity,
+            array_sizes=array_sizes
+        )
+
+    def compare_sharding_strategies(
+        self,
+        query_name: str,
+        strategies: List[Tuple[str, Dict[str, str]]],
+        query_params: Dict,
+        array_sizes: Optional[Dict[str, int]] = None
+    ) -> Dict[str, any]:
+        """
+        Compare different sharding strategies for a query
+
+        Args:
+            query_name: Name of query to execute (Q1-Q5)
+            strategies: List of (strategy_name, sharding_strategy_dict) tuples
+            query_params: Parameters for the query
+            array_sizes: Average array sizes
+
+        Returns:
+            Dict with results for each strategy
+        """
+        results = {}
+
+        query_methods = {
+            "Q1": self.execute_q1,
+            "Q2": self.execute_q2,
+            "Q3": self.execute_q3,
+            "Q4": self.execute_q4,
+            "Q5": self.execute_q5
+        }
+
+        if query_name not in query_methods:
+            raise ValueError(f"Unknown query: {query_name}")
+
+        query_method = query_methods[query_name]
+
+        for strategy_name, sharding_strategy in strategies:
+            params = {**query_params, "sharding_strategy": sharding_strategy, "array_sizes": array_sizes}
+            result = query_method(**params)
+            results[strategy_name] = result
+
+        return results
