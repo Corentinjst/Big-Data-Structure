@@ -21,15 +21,9 @@ def print_filter_result(query_name: str, result, sharding_strategy: str):
     print(f"{'Sharding':<15} {sharding_strategy}")
     print(f"{'S1 (docs)':<15} {result.s1:,}")
     print(f"{'O1 (docs)':<15} {result.o1:,}")
-    print(f"{'Loops':<15} {result.loops}")
-    print(f"{'Servers':<15} {result.num_servers_accessed}")
-    print(f"{'C1 (bytes)':<15} {result.c1_volume_bytes:,} ({result.c1_volume_bytes/1024/1024:.2f} MB)")
-
-    # Additional info
-    print(f"\n--- Additional Info ---")
-    print(f"Output Documents: {result.output_documents:,}")
+    print(f"Input Size: {result.input_doc_size_bytes:,} bytes ({result.input_doc_size_bytes/1024/1024:.2f} MB)")
     print(f"Output Size: {result.output_size_bytes:,} bytes ({result.output_size_bytes/1024/1024:.2f} MB)")
-    print(f"Index Used: {result.index_used}")
+    print(f"{'C1 (bytes)':<15} {result.c1_volume_bytes:,} ({result.c1_volume_bytes/1024/1024:.2f} MB)")    
 
     print(f"\n--- Costs ---")
     print(result.cost)
@@ -118,14 +112,15 @@ def test_q2_product_brand_query(db_num: int):
 
     # Define sharding strategies for Product collection
     sharding_strategies = [
-        ("Product sharded by IDP", {"Product": "IDP"}),
         ("Product sharded by brand", {"Product": "brand"}),
+        ("Product sharded by IDP", {"Product": "IDP"}),
     ]
 
     array_sizes = {
         2: {"categories": 2, "stocks": 200},
         5: {"categories": 2, "orderLines": 5}
     }
+    
 
     for strategy_name, sharding_dict in sharding_strategies:
         result = executor.execute_q2(
@@ -156,6 +151,7 @@ def test_q3_orderline_date_query(db_num: int):
         2: {"categories": 2, "stocks": 200},
         5: {"categories": 2, "orderLines": 5}
     }
+
 
     for strategy_name, sharding_dict in sharding_strategies:
         result = executor.execute_q3(
@@ -239,8 +235,7 @@ def main():
     print("Available queries: Q1, Q2, Q3, Q4, Q5")
 
     db_choice = input("\nEnter database number (1-5) or 'all' to test all: ").strip()
-    query_choice = input("Enter query number (1-5) or 'all' to test all: ").strip().upper()
-
+    query_choice = input("Enter query number (1-5) or 'all' to test all: ").strip()
     # Determine which databases to test
     if db_choice.lower() == 'all':
         databases = [1, 2, 3, 4, 5]
@@ -265,13 +260,19 @@ def main():
         'Q5': test_q5_product_stock_join_query
     }
 
-    if query_choice == 'ALL':
+    if query_choice.lower() == 'all':
         queries_to_test = list(query_functions.keys())
-    elif query_choice.startswith('Q') and query_choice in query_functions:
-        queries_to_test = [query_choice]
     else:
-        print(f"Invalid query choice. Testing Q1.")
-        queries_to_test = ['Q1']
+        try:
+            query_choice_num = int(query_choice)
+            if 1 <= query_choice_num <= 5:
+                queries_to_test = [f'Q{query_choice_num}']
+            else:
+                print(f"Invalid query choice. Testing Q1.")
+                queries_to_test = ['Q1']
+        except ValueError:
+            print(f"Invalid Input. Testing Q1.")
+            queries_to_test = ['Q1']
 
     # Run tests
     for db_num in databases:

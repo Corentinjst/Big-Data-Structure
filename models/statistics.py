@@ -17,7 +17,7 @@ class Statistics:
     orders_per_customer: int = 100
     products_per_customer: int = 20
     categories_per_product_avg: int = 2
-    num_brands: int = 5_000
+    num_brands: int = 2_000
     products_per_brand_apple: int = 50
     num_dates: int = 365
     num_servers: int = 1_000

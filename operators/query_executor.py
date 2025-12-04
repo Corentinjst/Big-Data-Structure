@@ -56,13 +56,14 @@ class QueryExecutor:
 
         sharding_key = sharding_strategy.get("Stock")
         output_keys = ["quantity", "location"]
+        filter_keys = ["IDP","IDW"]
 
         # Very selective - looking for exact match
         selectivity = 1 / stock_collection.document_count
 
-        return self.filter_op.execute_filter(
+        return self.filter_op.filter(
             collection=stock_collection,
-            filter_key="IDP",  # Filtering on IDP first
+            filter_keys=filter_keys,
             output_keys=output_keys,
             sharding_key=sharding_key,
             selectivity=selectivity,
@@ -104,9 +105,9 @@ class QueryExecutor:
             # Average selectivity for a brand
             selectivity = 1 / self.statistics.num_brands
 
-        return self.filter_op.execute_filter(
+        return self.filter_op.filter(
             collection=product_collection,
-            filter_key="brand",
+            filter_keys=["brand"],
             output_keys=output_keys,
             sharding_key=sharding_key,
             selectivity=selectivity,
@@ -144,9 +145,9 @@ class QueryExecutor:
         # Orders balanced over 365 dates
         selectivity = 1 / self.statistics.num_dates
 
-        return self.filter_op.execute_filter(
+        return self.filter_op.filter(
             collection=orderline_collection,
-            filter_key="date",
+            filter_keys=["date"],
             output_keys=output_keys,
             sharding_key=sharding_key,
             selectivity=selectivity,
@@ -249,43 +250,3 @@ class QueryExecutor:
             array_sizes=array_sizes
         )
 
-    def compare_sharding_strategies(
-        self,
-        query_name: str,
-        strategies: List[Tuple[str, Dict[str, str]]],
-        query_params: Dict,
-        array_sizes: Optional[Dict[str, int]] = None
-    ) -> Dict[str, any]:
-        """
-        Compare different sharding strategies for a query
-
-        Args:
-            query_name: Name of query to execute (Q1-Q5)
-            strategies: List of (strategy_name, sharding_strategy_dict) tuples
-            query_params: Parameters for the query
-            array_sizes: Average array sizes
-
-        Returns:
-            Dict with results for each strategy
-        """
-        results = {}
-
-        query_methods = {
-            "Q1": self.execute_q1,
-            "Q2": self.execute_q2,
-            "Q3": self.execute_q3,
-            "Q4": self.execute_q4,
-            "Q5": self.execute_q5
-        }
-
-        if query_name not in query_methods:
-            raise ValueError(f"Unknown query: {query_name}")
-
-        query_method = query_methods[query_name]
-
-        for strategy_name, sharding_strategy in strategies:
-            params = {**query_params, "sharding_strategy": sharding_strategy, "array_sizes": array_sizes}
-            result = query_method(**params)
-            results[strategy_name] = result
-
-        return results

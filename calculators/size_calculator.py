@@ -48,7 +48,6 @@ class SizeCalculator:
         Returns:
             Total byte size contributed by this field.
         """
-        
         # Add key-value overhead
         size = KEY_VALUE_OVERHEAD
         
