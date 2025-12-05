@@ -3,6 +3,8 @@ Main program to demonstrate the calculations using JSON schema parser
 Analyzes all 5 database designs (DB1-DB5) with different denormalization strategies
 """
 
+
+
 from typing import Dict, Optional
 from models.schema import Schema, Field, Database, Collection
 from models.statistics import Statistics

@@ -3,6 +3,12 @@ Test script for Chapter 3 - Filter and Join Queries
 Demonstrates the usage of query operators on different database designs
 """
 
+import sys
+import os
+# Add parent directory to path to import modules
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+
+
 from models.statistics import Statistics
 from parsers.schema_parser import SchemaParser
 from operators import QueryExecutor, FilterOperator, NestedLoopJoinOperator
@@ -33,6 +39,7 @@ def print_join_result(query_name: str, result, sharding_strategy: str):
     """Print join query results in TD2 correction format"""
     print(f"\n{'='*70}")
     print(f"{query_name} - Sharding Strategy: {sharding_strategy}")
+    print(f"Join Key: {result.join_key}")
     print(f"{'='*70}")
 
     # TD2 Correction Table Format (matching the PDF)
@@ -45,12 +52,16 @@ def print_join_result(query_name: str, result, sharding_strategy: str):
     print(f"\n{'--- C1 Phase ---':<20}")
     print(f"{'S1 (docs)':<20} {result.s1:,}")
     print(f"{'O1 (docs)':<20} {result.o1:,}")
+    print(f"Input Size: {result.input_size_bytes1:,} bytes ({result.input_size_bytes1/1024/1024:.2f} MB)")
+    print(f"Output Size: {result.output_size_bytes1:,} bytes ({result.output_size_bytes1/1024/1024:.2f} MB)")
 
     # C2 section
     print(f"\n{'--- C2 Phase ---':<20}")
     print(f"{'Loops':<20} {result.num_loops:,}")
     print(f"{'S2 (docs)':<20} {result.s2:,}")
     print(f"{'O2 (docs)':<20} {result.o2:,}")
+    print(f"Input Size: {result.input_size_bytes2:,} bytes ({result.input_size_bytes2/1024/1024:.2f} MB)")
+    print(f"Output Size: {result.output_size_bytes2:,} bytes ({result.output_size_bytes2/1024/1024:.2f} MB)")
 
     # Volumes
     print(f"\n{'--- Volumes ---':<20}")
@@ -59,14 +70,7 @@ def print_join_result(query_name: str, result, sharding_strategy: str):
     print(f"{'Total Vt':<20} {result.c1_volume_bytes + result.num_loops * result.c2_volume_bytes:,} bytes")
     print(f"{'# Messages':<20} {result.num_messages:,}")
 
-    # Additional Info
-    print(f"\n--- Additional Info ---")
-    print(f"Output Documents: {result.output_documents:,}")
-    print(f"Output Size: {result.output_size_bytes:,} bytes ({result.output_size_bytes/1024/1024:.2f} MB)")
-    print(f"Left Sharding Key: {result.left_sharding_key}")
-    print(f"Right Sharding Key: {result.right_sharding_key}")
-    print(f"Join Key: {result.join_key}")
-
+    
     # Costs
     print(f"\n--- Costs ---")
     print(result.cost)
@@ -79,7 +83,7 @@ def test_q1_stock_query(db_num: int):
     print(f"{'#'*70}")
 
     stats = Statistics()
-    db = SchemaParser.build_db_from_json(db_num, stats, f"schemas/db{db_num}.json")
+    db = SchemaParser.build_db_from_json(db_num, stats, f"../schemas/db{db_num}.json")
     executor = QueryExecutor(db, stats)
 
     # Define sharding strategies for Stock collection
@@ -107,7 +111,7 @@ def test_q2_product_brand_query(db_num: int):
     print(f"{'#'*70}")
 
     stats = Statistics()
-    db = SchemaParser.build_db_from_json(db_num, stats, f"schemas/db{db_num}.json")
+    db = SchemaParser.build_db_from_json(db_num, stats, f"../schemas/db{db_num}.json")
     executor = QueryExecutor(db, stats)
 
     # Define sharding strategies for Product collection
@@ -138,7 +142,7 @@ def test_q3_orderline_date_query(db_num: int):
     print(f"{'#'*70}")
 
     stats = Statistics()
-    db = SchemaParser.build_db_from_json(db_num, stats, f"schemas/db{db_num}.json")
+    db = SchemaParser.build_db_from_json(db_num, stats, f"../schemas/db{db_num}.json")
     executor = QueryExecutor(db, stats)
 
     # Define sharding strategies for OrderLine collection
@@ -169,7 +173,7 @@ def test_q4_stock_join_query(db_num: int):
     print(f"{'#'*70}")
 
     stats = Statistics()
-    db = SchemaParser.build_db_from_json(db_num, stats, f"schemas/db{db_num}.json")
+    db = SchemaParser.build_db_from_json(db_num, stats, f"../schemas/db{db_num}.json")
     executor = QueryExecutor(db, stats)
 
     # Define sharding strategies
@@ -200,13 +204,14 @@ def test_q5_product_stock_join_query(db_num: int):
     print(f"{'#'*70}")
 
     stats = Statistics()
-    db = SchemaParser.build_db_from_json(db_num, stats, f"schemas/db{db_num}.json")
+    db = SchemaParser.build_db_from_json(db_num, stats, f"../schemas/db{db_num}.json")
     executor = QueryExecutor(db, stats)
 
+    # INVERSER PAR RAPPORT A l'ENONCE MAIS DANS CE SENS POUR LA CORRECTION
     # Define sharding strategies
     sharding_strategies = [
-        ("Product(brand), Stock(IDP)", {"Product": "brand", "Stock": "IDP"}),
-        ("Product(IDP), Stock(IDP)", {"Product": "IDP", "Stock": "IDP"}),
+        ("Product(brand),Stock(IDP)", {"Product": "brand","Stock": "IDP"}),
+        ("Product(IDP),Stock(IDP)", {"Product": "IDP","Stock": "IDP"}),
     ]
 
     array_sizes = {

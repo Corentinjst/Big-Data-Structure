@@ -175,6 +175,7 @@ class QueryExecutor:
         Returns:
             JoinResult
         """
+
         stock_collection = self.database.get_collection("Stock")
         product_collection = self.database.get_collection("Product")
 
@@ -184,20 +185,27 @@ class QueryExecutor:
         stock_sharding = sharding_strategy.get("Stock")
         product_sharding = sharding_strategy.get("Product")
 
-        output_keys = ["name", "quantity"]
+        left_output_keys = ["quantity"]
+        right_output_keys = ["name"]
+
+
+
 
         # Filter selectivity: 1 warehouse out of 200
-        filter_selectivity = 1 / self.statistics.num_warehouses
+        left_filter_selectivity = 1 / self.statistics.num_warehouses
+        right_filter_selectivity = 1 / product_collection.document_count
 
-        return self.join_op.execute_join(
+        return self.join_op.nested_loop_join(
             left_collection=stock_collection,
             right_collection=product_collection,
             join_key="IDP",
-            output_keys=output_keys,
+            left_output_keys=left_output_keys,
+            right_output_keys =right_output_keys,
             left_sharding_key=stock_sharding,
             right_sharding_key=product_sharding,
-            left_filter_key="IDW",
-            left_filter_selectivity=filter_selectivity,
+            left_filter_keys=["IDW"],
+            left_filter_selectivity=left_filter_selectivity,
+            right_filter_selectivity=right_filter_selectivity,
             array_sizes=array_sizes
         )
 
@@ -221,6 +229,9 @@ class QueryExecutor:
         Returns:
             JoinResult
         """
+
+        # SENS COMME LE TD ET LA CORRECTION (INVERSE DANS LA CORRECTION (le P et le S) MAIS BON CALCUL)
+
         product_collection = self.database.get_collection("Product")
         stock_collection = self.database.get_collection("Stock")
 
@@ -230,23 +241,28 @@ class QueryExecutor:
         product_sharding = sharding_strategy.get("Product")
         stock_sharding = sharding_strategy.get("Stock")
 
-        output_keys = ["name", "price", "IDW", "quantity"]
+        left_output_keys = ["name", "price"]
+        right_output_keys = ["IDW", "quantity"]
 
         # Filter selectivity for Apple brand
         if brand.lower() == "apple":
-            filter_selectivity = self.statistics.products_per_brand_apple / self.statistics.num_products
+            left_filter_selectivity = self.statistics.products_per_brand_apple / self.statistics.num_products
         else:
-            filter_selectivity = 1 / self.statistics.num_brands
+            left_filter_selectivity = 1 / self.statistics.num_brands
 
-        return self.join_op.execute_join(
+        right_filter_selectivity = 1/self.statistics.num_products
+
+        return self.join_op.nested_loop_join(
             left_collection=product_collection,
             right_collection=stock_collection,
             join_key="IDP",
-            output_keys=output_keys,
+            left_output_keys=left_output_keys,
+            right_output_keys =right_output_keys,
             left_sharding_key=product_sharding,
             right_sharding_key=stock_sharding,
-            left_filter_key="brand",
-            left_filter_selectivity=filter_selectivity,
+            left_filter_keys=["brand"],
+            left_filter_selectivity=left_filter_selectivity,
+            right_filter_selectivity=right_filter_selectivity,
             array_sizes=array_sizes
         )
 

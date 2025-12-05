@@ -15,8 +15,10 @@ from .filter_operator import FilterOperator, FilterResult
 @dataclass
 class JoinResult:
     """Result of a join operation"""
-    output_documents: int
-    output_size_bytes: int
+    output_size_bytes1: int
+    input_size_bytes1: int
+    output_size_bytes2: int
+    input_size_bytes2: int
     cost: QueryCost
     left_sharding_key: Optional[str] = None
     right_sharding_key: Optional[str] = None
@@ -48,230 +50,181 @@ class NestedLoopJoinOperator:
         self.statistics = statistics
         self.size_calculator = SizeCalculator(statistics)
         self.filter_operator = FilterOperator(statistics)
-
-    def calculate_join_output_size(
+    
+    def calculate_join_input_size(
         self,
-        left_collection: Collection,
-        right_collection: Collection,
+        collection: Collection,
+        join_key : str,
         output_keys: List[str],
+        filter_keys: Optional[List[str]] = None,
         array_sizes: Optional[Dict[str, int]] = None
-    ) -> int:
+        ) -> int:
         """
-        Calculate the size of join output documents
+        Calculate the size of output documents with only selected keys
 
         Args:
-            left_collection: Left collection in join
-            right_collection: Right collection in join
+            collection: Source collection
             output_keys: Keys to include in output
             array_sizes: Average sizes for arrays
 
         Returns:
             Size in bytes of output document
         """
-        output_schema = Schema(name="join_output")
+        # Create a schema with only the output keys
+        output_schema = Schema(name=f"{collection.schema.name}_output")
 
         for key in output_keys:
-            field = left_collection.schema.get_field(key)
+            field = collection.schema.get_field(key)
             if field:
                 output_schema.add_field(field)
-            else:
-                field = right_collection.schema.get_field(key)
+
+        if filter_keys :
+            for key in filter_keys:
+                field = collection.schema.get_field(key)
                 if field:
                     output_schema.add_field(field)
+        
+        field = collection.schema.get_field(join_key)
+        if field:
+            output_schema.add_field(field)
 
-        return self.size_calculator.calculate_document_size(
-            output_schema, array_sizes or {}
-        )
+        # Calculate size
+        return self.size_calculator.calculate_document_size(output_schema, {})
+    
+    def calculate_join_output_size(
+        self,
+        collection: Collection,
+        output_keys: List[str],
+        array_sizes: Optional[Dict[str, int]] = None
+        ) -> int:
+        """
+        Calculate the size of output documents with only selected keys
 
-    # ----------------------------------------------------------
-    # JOIN WITH SHARDING
-    # ----------------------------------------------------------
-    def nested_loop_join_with_sharding(
+        Args:
+            collection: Source collection
+            output_keys: Keys to include in output
+            array_sizes: Average sizes for arrays
+
+        Returns:
+            Size in bytes of output document
+        """
+        # Create a schema with only the output keys
+        output_schema = Schema(name=f"{collection.schema.name}_output")
+
+        for key in output_keys:
+            field = collection.schema.get_field(key)
+            if field:
+                output_schema.add_field(field)
+
+        # Calculate size
+        return self.size_calculator.calculate_document_size(output_schema, {})
+
+    def nested_loop_join(
         self,
         left_collection: Collection,
         right_collection: Collection,
         join_key: str,
-        output_keys: List[str],
-        left_sharding_key: str,
-        right_sharding_key: str,
-        left_filter_key: Optional[str] = None,
+        left_output_keys: Optional[List[str]],
+        right_output_keys: Optional[List[str]],
+        left_sharding_key: Optional[str] = None,
+        right_sharding_key: Optional[str] = None,
+        left_filter_keys: Optional[List[str]] = None,
+        right_filter_keys: Optional[List[str]] = None,
         left_filter_selectivity: Optional[float] = None,
+        right_filter_selectivity: Optional[float] = None,
         array_sizes: Optional[Dict[str, int]] = None
     ) -> JoinResult:
         """
-        Execute a nested loop join with sharding optimization
+        Execute a nested loop join with optional sharding optimization
+
+        Args:
+            left_collection: Left collection in join
+            right_collection: Right collection in join
+            join_key: Key to join on
+            output_keys: Keys to include in output
+            left_sharding_key: Sharding key for left collection (if any)
+            right_sharding_key: Sharding key for right collection (if any)
+            left_filter_key: Filter keys on left collection (if any)
+            left_filter_selectivity: Filter selectivity on left collection
+            array_sizes: Average sizes for arrays
+
+        Returns:
+            JoinResult with output metrics and costs
         """
+        # Determine if sharding is used
+        use_sharding = bool(left_sharding_key and right_sharding_key)
 
-        left_doc_size = self.size_calculator.calculate_document_size(
-            left_collection.schema, array_sizes or {}
-        )
-        right_doc_size = self.size_calculator.calculate_document_size(
-            right_collection.schema, array_sizes or {}
-        )
-        output_doc_size = self.calculate_join_output_size(
-            left_collection, right_collection, output_keys, array_sizes
-        )
-
-        # Filter selectivity
-        if left_filter_key and left_filter_selectivity:
-            effective_left_docs = int(left_collection.document_count * left_filter_selectivity)
+        #calculate to how much server the left part of the join is sent
+        if use_sharding and left_filter_keys and left_sharding_key in left_filter_keys  : 
+            s1 = 1
         else:
-            effective_left_docs = left_collection.document_count
-            left_filter_selectivity = 1.0
+            s1 = self.statistics.num_servers
+        
+        #calculate to how much server the left part of the join is sent
+        if use_sharding and ((right_filter_keys and right_sharding_key in right_filter_keys) or right_sharding_key == join_key): 
+            s2 = 1
+        else:
+            s2 = self.statistics.num_servers
 
-        both_sharded_on_join = (
+        # A VOIR A PARTIR DE ICI
+
+        # Compute effective left documents after filter
+        o1 = int(left_collection.document_count * left_filter_selectivity)
+
+        # Compute effective right left documents
+        o2 = int(right_collection.document_count * right_filter_selectivity)
+        
+
+        #Compute document size
+        input_doc_size_1 = self.calculate_join_input_size(left_collection,join_key,left_output_keys,left_filter_keys,array_sizes)
+        output_doc_size_1 = self.calculate_join_output_size(left_collection, left_output_keys, array_sizes)
+
+        input_doc_size_2 = self.calculate_join_input_size(right_collection,join_key,right_output_keys,right_filter_keys,array_sizes)
+        output_doc_size_2 = self.calculate_join_output_size(right_collection, right_output_keys, array_sizes)
+
+
+        c1_volume = s1 * input_doc_size_1 + o1 * output_doc_size_1
+        c2_volume = s2 * input_doc_size_2 + o2 * output_doc_size_2
+
+        """# Determine if both collections are sharded on join key
+        both_sharded_on_join = use_sharding and (
             left_sharding_key == join_key and right_sharding_key == join_key
-        )
+        )"""
 
-        num_servers = self.statistics.num_servers
+        num_loops = o1
 
-        if both_sharded_on_join:
-            # Co-located join → in TD2 correction, #msg = 1
-            output_documents = effective_left_docs
-            num_loops = max(1, effective_left_docs // num_servers)
-        else:
-            # Broadcast join
-            output_documents = effective_left_docs
-            num_loops = effective_left_docs
-
-        # NEW: retrieve cost + metadata (C1, C2, loops, messages)
-        cost, meta = CostModel.calculate_nested_loop_join_cost(
-            left_documents=effective_left_docs,
-            right_documents=right_collection.document_count,
+        num_messages = 0
+        cost = 0
+        # Calculate cost with metadata
+        """cost, num_messages = CostModel.calculate_nested_loop_join_cost(
+            left_documents=o1,
+            right_documents=s2,
             left_doc_size=left_doc_size,
             right_doc_size=right_doc_size,
             output_documents=output_documents,
             output_doc_size=output_doc_size,
-            use_sharding=True,
-            left_sharded=(left_sharding_key == join_key),
-            right_sharded=(right_sharding_key == join_key),
-            num_servers=num_servers,
+            use_sharding=use_sharding,
+            left_sharded=(left_sharding_key == join_key) if use_sharding else False,
+            right_sharded=(right_sharding_key == join_key) if use_sharding else False,
+            num_servers=max(s1,s2),
             num_loops=num_loops
-        )
+        )"""
 
         return JoinResult(
-            output_documents=output_documents,
-            output_size_bytes=output_documents * output_doc_size,
+            output_size_bytes1=output_doc_size_1,
+            input_size_bytes1=input_doc_size_1,
+            output_size_bytes2=output_doc_size_2,
+            input_size_bytes2=input_doc_size_2,
             cost=cost,
             left_sharding_key=left_sharding_key,
             right_sharding_key=right_sharding_key,
             join_key=join_key,
             num_loops=num_loops,
-
-            # TD2 Correction format fields
-            s1=left_collection.document_count,
-            o1=effective_left_docs,
-            s2=right_collection.document_count,
-            o2=1,  # Typically 1 matching document per loop
-            c1_volume_bytes=meta["c1"],
-            c2_volume_bytes=meta["c2"],
-            num_messages=meta["messages"]
+            s1=s1,
+            o1=o1,
+            s2=s2,
+            o2=o2,  
+            c1_volume_bytes=c1_volume,
+            c2_volume_bytes=c2_volume,
+            num_messages=num_messages
         )
-
-    # ----------------------------------------------------------
-    # JOIN WITHOUT SHARDING
-    # ----------------------------------------------------------
-    def nested_loop_join_without_sharding(
-        self,
-        left_collection: Collection,
-        right_collection: Collection,
-        join_key: str,
-        output_keys: List[str],
-        left_filter_key: Optional[str] = None,
-        left_filter_selectivity: Optional[float] = None,
-        array_sizes: Optional[Dict[str, int]] = None
-    ) -> JoinResult:
-        """
-        Execute a nested loop join without sharding optimization
-        """
-
-        left_doc_size = self.size_calculator.calculate_document_size(
-            left_collection.schema, array_sizes or {}
-        )
-        right_doc_size = self.size_calculator.calculate_document_size(
-            right_collection.schema, array_sizes or {}
-        )
-        output_doc_size = self.calculate_join_output_size(
-            left_collection, right_collection, output_keys, array_sizes
-        )
-
-        if left_filter_key and left_filter_selectivity:
-            effective_left_docs = int(left_collection.document_count * left_filter_selectivity)
-        else:
-            effective_left_docs = left_collection.document_count
-
-        output_documents = effective_left_docs
-        num_loops = effective_left_docs
-
-        # No sharding → everything is scanned/broadcast
-        cost, meta = CostModel.calculate_nested_loop_join_cost(
-            left_documents=effective_left_docs,
-            right_documents=right_collection.document_count,
-            left_doc_size=left_doc_size,
-            right_doc_size=right_doc_size,
-            output_documents=output_documents,
-            output_doc_size=output_doc_size,
-            use_sharding=False,
-            num_servers=1,
-            num_loops=num_loops
-        )
-
-        return JoinResult(
-            output_documents=output_documents,
-            output_size_bytes=output_documents * output_doc_size,
-            cost=cost,
-            join_key=join_key,
-            num_loops=num_loops,
-
-            # TD2 Correction format fields
-            s1=left_collection.document_count,
-            o1=effective_left_docs,
-            s2=right_collection.document_count,
-            o2=1,  # Typically 1 matching document per loop
-            c1_volume_bytes=meta["c1"],
-            c2_volume_bytes=meta["c2"],
-            num_messages=meta["messages"]
-        )
-
-    # ----------------------------------------------------------
-    # AUTO-SELECTION
-    # ----------------------------------------------------------
-    def execute_join(
-        self,
-        left_collection: Collection,
-        right_collection: Collection,
-        join_key: str,
-        output_keys: List[str],
-        left_sharding_key: Optional[str] = None,
-        right_sharding_key: Optional[str] = None,
-        left_filter_key: Optional[str] = None,
-        left_filter_selectivity: Optional[float] = None,
-        array_sizes: Optional[Dict[str, int]] = None
-    ) -> JoinResult:
-        """
-        Execute a nested loop join (auto choose with/without sharding)
-        """
-
-        if left_sharding_key and right_sharding_key:
-            return self.nested_loop_join_with_sharding(
-                left_collection=left_collection,
-                right_collection=right_collection,
-                join_key=join_key,
-                output_keys=output_keys,
-                left_sharding_key=left_sharding_key,
-                right_sharding_key=right_sharding_key,
-                left_filter_key=left_filter_key,
-                left_filter_selectivity=left_filter_selectivity,
-                array_sizes=array_sizes
-            )
-
-        else:
-            return self.nested_loop_join_without_sharding(
-                left_collection=left_collection,
-                right_collection=right_collection,
-                join_key=join_key,
-                output_keys=output_keys,
-                left_filter_key=left_filter_key,
-                left_filter_selectivity=left_filter_selectivity,
-                array_sizes=array_sizes
-            )

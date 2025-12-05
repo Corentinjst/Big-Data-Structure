@@ -284,12 +284,7 @@ class CostModel:
             total_cost = scan_cost + output_cost
 
         # ---- NEW: return also C1, C2, loops and #messages ----
-        meta = {
-            "c1": c1_volume,
-            "c2": c2_volume,
-            "loops": num_loops,
-            "messages": num_messages
-        }
+       
 
-        return total_cost, meta
+        return total_cost, num_messages
 
