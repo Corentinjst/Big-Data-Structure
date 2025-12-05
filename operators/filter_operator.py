@@ -142,8 +142,10 @@ class FilterOperator:
         #calculate to how much server the query is sent
         if use_sharding and sharding_key in filter_keys : 
             s1 = 1
+            total_document_accessed = collection.document_count/self.statistics.num_servers
         else:
             s1 = self.statistics.num_servers
+            total_document_accessed = collection.document_count
 
         # Calculate output documents
         o1 = int(collection.document_count * selectivity)
@@ -152,20 +154,19 @@ class FilterOperator:
         input_doc_size = self.calculate_input_size(collection,output_keys,filter_keys,array_sizes)
         output_doc_size = self.calculate_output_size(collection, output_keys, array_sizes)
 
-        # Calculate cost
-        cost = CostModel.calculate_filter_cost(
-            total_documents=collection.document_count,
-            output_documents=o1,
-            doc_size_bytes=input_doc_size,
-            output_doc_size_bytes=output_doc_size,
-            use_sharding=use_sharding,
-            use_index=use_sharding and (sharding_key in filter_keys), # First condition to return false if no sharding
-            num_servers=s1,
-            selectivity=selectivity
-        )
-
         # Calculate C1 volume: #S1 * size(S1) + #O1 * size(O1)
         c1_volume = s1 * input_doc_size + o1 * output_doc_size
+
+        # Calculate cost
+        cost = CostModel.calculate_filter_cost(
+            total_document_accessed=total_document_accessed,
+            doc_size_bytes=input_doc_size,
+            c1 = c1_volume,
+            use_index=use_sharding and (sharding_key in filter_keys), # First condition to return false if no sharding
+            num_servers_involved=s1,
+        )
+
+        
 
         return FilterResult(
             output_size_bytes=output_doc_size,

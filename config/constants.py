@@ -22,7 +22,7 @@ TYPE_SIZES = {
 # ATTENTION CONVERTIR EN OCTET/S ?
 
 # Network and query execution constants
-BANDWIDTH_SPEED = 1_000_000_000  # 1 Gbps = 1,000,000,000 bits/s = 125,000,000 bytes/s
+BANDWIDTH_SPEED = 15_000_000  
 BANDWIDTH_SPEED_BYTES_PER_MS = BANDWIDTH_SPEED / 1000  # bytes per millisecond
 
 # Cost constants

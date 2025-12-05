@@ -25,14 +25,12 @@ class JoinResult:
     join_key: str = ""
     num_loops: int = 0
 
-    # TD2 Correction format fields (matching table columns)
     s1: int = 0  # Number of documents from left collection
     o1: int = 0  # Number of output documents from left (after filter)
     s2: int = 0  # Number of documents from right collection per loop
     o2: int = 0  # Number of output documents from right per loop
     c1_volume_bytes: int = 0  # C1 = #S1 * size(S1) + #O1 * size(O1)
     c2_volume_bytes: int = 0  # C2 = #S2 * size(S2) + #O2 * size(O2)
-    num_messages: int = 0  # Number of messages exchanged
 
 
 class NestedLoopJoinOperator:
@@ -157,14 +155,18 @@ class NestedLoopJoinOperator:
         #calculate to how much server the left part of the join is sent
         if use_sharding and left_filter_keys and left_sharding_key in left_filter_keys  : 
             s1 = 1
+            total_document_accessed_left = left_collection.document_count/self.statistics.num_servers
         else:
             s1 = self.statistics.num_servers
+            total_document_accessed_left = left_collection.document_count
         
         #calculate to how much server the left part of the join is sent
         if use_sharding and ((right_filter_keys and right_sharding_key in right_filter_keys) or right_sharding_key == join_key): 
             s2 = 1
+            total_document_accessed_right = right_collection.document_count/self.statistics.num_servers
         else:
             s2 = self.statistics.num_servers
+            total_document_accessed_right = right_collection.document_count
 
         # A VOIR A PARTIR DE ICI
 
@@ -193,22 +195,20 @@ class NestedLoopJoinOperator:
 
         num_loops = o1
 
-        num_messages = 0
         cost = 0
         # Calculate cost with metadata
-        """cost, num_messages = CostModel.calculate_nested_loop_join_cost(
-            left_documents=o1,
-            right_documents=s2,
-            left_doc_size=left_doc_size,
-            right_doc_size=right_doc_size,
-            output_documents=output_documents,
-            output_doc_size=output_doc_size,
-            use_sharding=use_sharding,
-            left_sharded=(left_sharding_key == join_key) if use_sharding else False,
-            right_sharded=(right_sharding_key == join_key) if use_sharding else False,
-            num_servers=max(s1,s2),
-            num_loops=num_loops
-        )"""
+        cost = CostModel.calculate_nested_loop_join_cost(
+        total_document_accessed_left=total_document_accessed_left,
+        total_document_accessed_right=total_document_accessed_right,
+        doc_size_bytes_left=input_doc_size_1,
+        doc_size_bytes_right=input_doc_size_2,
+        c1=c1_volume,
+        c2=c2_volume,
+        num_loops=num_loops,
+        use_index=False,
+        num_servers_s1=s1,
+        num_servers_s2=s2
+        )
 
         return JoinResult(
             output_size_bytes1=output_doc_size_1,
@@ -226,5 +226,4 @@ class NestedLoopJoinOperator:
             o2=o2,  
             c1_volume_bytes=c1_volume,
             c2_volume_bytes=c2_volume,
-            num_messages=num_messages
         )

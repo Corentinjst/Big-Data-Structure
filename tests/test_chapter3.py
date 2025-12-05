@@ -15,12 +15,11 @@ from operators import QueryExecutor, FilterOperator, NestedLoopJoinOperator
 
 
 def print_filter_result(query_name: str, result, sharding_strategy: str):
-    """Print filter query results in TD2 correction format"""
+    """Print filter query results"""
     print(f"\n{'='*70}")
     print(f"{query_name} - Sharding Strategy: {sharding_strategy}")
     print(f"{'='*70}")
 
-    # TD2 Correction Table Format
     print("\n--- TD2 Correction Format ---")
     print(f"{'Column':<15} {'Value':<20}")
     print(f"{'-'*35}")
@@ -36,13 +35,12 @@ def print_filter_result(query_name: str, result, sharding_strategy: str):
 
 
 def print_join_result(query_name: str, result, sharding_strategy: str):
-    """Print join query results in TD2 correction format"""
+    """Print join query results"""
     print(f"\n{'='*70}")
     print(f"{query_name} - Sharding Strategy: {sharding_strategy}")
     print(f"Join Key: {result.join_key}")
     print(f"{'='*70}")
 
-    # TD2 Correction Table Format (matching the PDF)
     print("\n--- TD2 Correction Format ---")
     print(f"{'Column':<20} {'Value':<25}")
     print(f"{'-'*45}")
@@ -68,7 +66,6 @@ def print_join_result(query_name: str, result, sharding_strategy: str):
     print(f"{'C1 (bytes)':<20} {result.c1_volume_bytes:,} ({result.c1_volume_bytes/1024/1024:.4f} MB)")
     print(f"{'C2 (bytes)':<20} {result.c2_volume_bytes:,} ({result.c2_volume_bytes/1024/1024:.4f} MB)")
     print(f"{'Total Vt':<20} {result.c1_volume_bytes + result.num_loops * result.c2_volume_bytes:,} bytes")
-    print(f"{'# Messages':<20} {result.num_messages:,}")
 
     
     # Costs
