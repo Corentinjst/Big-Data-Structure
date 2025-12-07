@@ -152,7 +152,7 @@ class NestedLoopJoinOperator:
         # Determine if sharding is used
         use_sharding = bool(left_sharding_key and right_sharding_key)
 
-        #calculate to how much server the left part of the join is sent
+        #compute to how much server the left part of the join is sent
         if use_sharding and left_filter_keys and left_sharding_key in left_filter_keys  : 
             s1 = 1
             total_document_accessed_left = left_collection.document_count/self.statistics.num_servers
@@ -160,15 +160,13 @@ class NestedLoopJoinOperator:
             s1 = self.statistics.num_servers
             total_document_accessed_left = left_collection.document_count
         
-        #calculate to how much server the left part of the join is sent
+        #compute to how much server the left part of the join is sent
         if use_sharding and ((right_filter_keys and right_sharding_key in right_filter_keys) or right_sharding_key == join_key): 
             s2 = 1
             total_document_accessed_right = right_collection.document_count/self.statistics.num_servers
         else:
             s2 = self.statistics.num_servers
             total_document_accessed_right = right_collection.document_count
-
-        # A VOIR A PARTIR DE ICI
 
         # Compute effective left documents after filter
         o1 = int(left_collection.document_count * left_filter_selectivity)
@@ -184,7 +182,7 @@ class NestedLoopJoinOperator:
         input_doc_size_2 = self.calculate_join_input_size(right_collection,join_key,right_output_keys,right_filter_keys,array_sizes)
         output_doc_size_2 = self.calculate_join_output_size(right_collection, right_output_keys, array_sizes)
 
-
+        # Compute c1 and c2 volume
         c1_volume = s1 * input_doc_size_1 + o1 * output_doc_size_1
         c2_volume = s2 * input_doc_size_2 + o2 * output_doc_size_2
 
@@ -195,8 +193,8 @@ class NestedLoopJoinOperator:
 
         num_loops = o1
 
-        cost = 0
-        # Calculate cost with metadata
+        #Compute cost
+
         cost = CostModel.calculate_nested_loop_join_cost(
         total_document_accessed_left=total_document_accessed_left,
         total_document_accessed_right=total_document_accessed_right,

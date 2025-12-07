@@ -44,7 +44,7 @@ class QueryCost:
         """String representation of query cost"""
         return (
             f"QueryCost(\n"
-            f"  Time: {self.time_ms:.3f} ms ({self.time_ms/1000:.3f} s)\n"
+            f"  Communication time: {self.time_ms:.3f} ms ({self.time_ms/1000:.3f} s)\n"
             f"  Carbon: {self.carbon_gco2:.2f} gCO2\n"
             f"  Price: ${self.price_usd:.6f} USD\n"
             f"  Data Volume: {self.data_volume_bytes:,} bytes ({self.data_volume_bytes/1024/1024:.2f} MB)\n"

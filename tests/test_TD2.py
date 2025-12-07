@@ -93,8 +93,6 @@ def test_q1_stock_query(db_num: int):
 
     for strategy_name, sharding_dict in sharding_strategies:
         result = executor.execute_q1(
-            idp_value=12345,
-            idw_value=42,
             sharding_strategy=sharding_dict,
             array_sizes=array_sizes.get(db_num, {"categories": 2})
         )
@@ -156,7 +154,6 @@ def test_q3_orderline_date_query(db_num: int):
 
     for strategy_name, sharding_dict in sharding_strategies:
         result = executor.execute_q3(
-            date="2024-01-15",
             sharding_strategy=sharding_dict,
             array_sizes=array_sizes.get(db_num, {"categories": 2})
         )
@@ -187,7 +184,6 @@ def test_q4_stock_join_query(db_num: int):
 
     for strategy_name, sharding_dict in sharding_strategies:
         result = executor.execute_q4(
-            idw_value=42,
             sharding_strategy=sharding_dict,
             array_sizes=array_sizes.get(db_num, {"categories": 2})
         )

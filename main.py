@@ -1,9 +1,8 @@
 """
 Main program to demonstrate the calculations using JSON schema parser
 Analyzes all 5 database designs (DB1-DB5) with different denormalization strategies
+Includes filter and join query testing capabilities
 """
-
-
 
 from typing import Dict, Optional
 from models.schema import Schema, Field, Database, Collection
@@ -11,8 +10,10 @@ from models.statistics import Statistics
 from parsers.schema_parser import SchemaParser
 from calculators.size_calculator import SizeCalculator
 from calculators.shard_calculator import ShardCalculator
+from operators import QueryExecutor
 
-def print_db_analysis(db: Database, db_index: int,stats: Statistics, 
+
+def print_db_analysis(db: Database, db_index: int, stats: Statistics, 
                      size_calc: SizeCalculator, shard_calc: ShardCalculator):
     """
     Print complete analysis for a database including sizes and sharding
@@ -40,16 +41,15 @@ def print_db_analysis(db: Database, db_index: int,stats: Statistics,
     print(f"Signature: {signatures.get(db_index, 'Unknown')}")
 
     # Get Array Average sizes
-
     avg_sizes = {
         1: {"categories": 2},
-        2: {"categories": 2,"stocks": 200},
+        2: {"categories": 2, "stocks": 200},
         3: {"categories": 2},
         4: {"categories": 2},
-        5: {"categories": 2,"orderLines":5}
+        5: {"categories": 2, "orderLines": 5}
     }
     array_sizes = avg_sizes.get(db_index)
-    print((f"Average array sizes: {array_sizes}"))
+    print(f"Average array sizes: {array_sizes}")
     
     # Document Sizes
     print("\n### Document Sizes ###\n")
@@ -130,39 +130,245 @@ def print_db_analysis(db: Database, db_index: int,stats: Statistics,
             print(f"  Avg docs/server: {metrics['avg_docs_per_server']:,.1f}")
             print(f"  Avg distinct values/server: {metrics['avg_distinct_per_server']:.1f}")
             print(f"  Server utilization: {metrics['server_utilization']*100:.1f}%")
+
+
+def print_filter_result(query_name: str, result, sharding_strategy: str):
+    """Print filter query results in TD2 correction format"""
+    print(f"\n{'='*70}")
+    print(f"{query_name} - Sharding Strategy: {sharding_strategy}")
+    print(f"{'='*70}")
+
+    print("\n--- TD2 Correction Format ---")
+    print(f"{'Column':<15} {'Value':<20}")
+    print(f"{'-'*35}")
+    print(f"{'Sharding':<15} {sharding_strategy}")
+    print(f"{'S1 (docs)':<15} {result.s1:,}")
+    print(f"{'O1 (docs)':<15} {result.o1:,}")
+    print(f"Input Size: {result.input_doc_size_bytes:,} bytes ({result.input_doc_size_bytes/1024/1024:.2f} MB)")
+    print(f"Output Size: {result.output_size_bytes:,} bytes ({result.output_size_bytes/1024/1024:.2f} MB)")
+    print(f"{'C1 (bytes)':<15} {result.c1_volume_bytes:,} ({result.c1_volume_bytes/1024/1024:.2f} MB)")    
+
+    print(f"\n--- Costs ---")
+    print(result.cost)
+
+
+def print_join_result(query_name: str, result, sharding_strategy: str):
+    """Print join query results in TD2 correction format"""
+    print(f"\n{'='*70}")
+    print(f"{query_name} - Sharding Strategy: {sharding_strategy}")
+    print(f"Join Key: {result.join_key}")
+    print(f"{'='*70}")
+
+    print("\n--- TD2 Correction Format ---")
+    print(f"{'Column':<20} {'Value':<25}")
+    print(f"{'-'*45}")
+    print(f"{'Sharding':<20} {sharding_strategy}")
+
+    # C1 section
+    print(f"\n{'--- C1 Phase ---':<20}")
+    print(f"{'S1 (docs)':<20} {result.s1:,}")
+    print(f"{'O1 (docs)':<20} {result.o1:,}")
+    print(f"Input Size: {result.input_size_bytes1:,} bytes ({result.input_size_bytes1/1024/1024:.2f} MB)")
+    print(f"Output Size: {result.output_size_bytes1:,} bytes ({result.output_size_bytes1/1024/1024:.2f} MB)")
+
+    # C2 section
+    print(f"\n{'--- C2 Phase ---':<20}")
+    print(f"{'Loops':<20} {result.num_loops:,}")
+    print(f"{'S2 (docs)':<20} {result.s2:,}")
+    print(f"{'O2 (docs)':<20} {result.o2:,}")
+    print(f"Input Size: {result.input_size_bytes2:,} bytes ({result.input_size_bytes2/1024/1024:.2f} MB)")
+    print(f"Output Size: {result.output_size_bytes2:,} bytes ({result.output_size_bytes2/1024/1024:.2f} MB)")
+
+    # Volumes
+    print(f"\n{'--- Volumes ---':<20}")
+    print(f"{'C1 (bytes)':<20} {result.c1_volume_bytes:,} ({result.c1_volume_bytes/1024/1024:.4f} MB)")
+    print(f"{'C2 (bytes)':<20} {result.c2_volume_bytes:,} ({result.c2_volume_bytes/1024/1024:.4f} MB)")
+    print(f"{'Total Vt':<20} {result.c1_volume_bytes + result.num_loops * result.c2_volume_bytes:,} bytes")
     
+    # Costs
+    print(f"\n--- Costs ---")
+    print(result.cost)
+
+
+def run_query_tests(db_num: int, query_choice: str):
+    """Run query tests for specified database and query"""
+    stats = Statistics()
+    db = SchemaParser.build_db_from_json(db_num, stats, f"schemas/db{db_num}.json")
+    executor = QueryExecutor(db, stats)
+    
+    array_sizes = {
+        1: {"categories": 2},
+        2: {"categories": 2, "stocks": 200},
+        3: {"categories": 2},
+        4: {"categories": 2},
+        5: {"categories": 2, "orderLines": 5}
+    }
+    
+    if query_choice in ['1', 'all']:
+        # Q1: Stock query
+        print(f"\n{'#'*70}")
+        print(f"# Testing Q1 on DB{db_num}")
+        print(f"{'#'*70}")
+        
+        sharding_strategies = [
+            ("Stock sharded by IDP", {"Stock": "IDP"}),
+            ("Stock sharded by IDW", {"Stock": "IDW"}),
+        ]
+        
+        for strategy_name, sharding_dict in sharding_strategies:
+            result = executor.execute_q1(
+                sharding_strategy=sharding_dict,
+                array_sizes=array_sizes.get(db_num)
+            )
+            print_filter_result("Q1", result, strategy_name)
+    
+    if query_choice in ['2', 'all']:
+        # Q2: Product brand query
+        print(f"\n{'#'*70}")
+        print(f"# Testing Q2 on DB{db_num}")
+        print(f"{'#'*70}")
+        
+        sharding_strategies = [
+            ("Product sharded by brand", {"Product": "brand"}),
+            ("Product sharded by IDP", {"Product": "IDP"}),
+        ]
+        
+        for strategy_name, sharding_dict in sharding_strategies:
+            result = executor.execute_q2(
+                brand="Apple",
+                sharding_strategy=sharding_dict,
+                array_sizes=array_sizes.get(db_num)
+            )
+            print_filter_result("Q2", result, strategy_name)
+    
+    if query_choice in ['3', 'all']:
+        # Q3: OrderLine date query
+        print(f"\n{'#'*70}")
+        print(f"# Testing Q3 on DB{db_num}")
+        print(f"{'#'*70}")
+        
+        sharding_strategies = [
+            ("OrderLine sharded by IDC", {"OrderLine": "IDC"}),
+            ("OrderLine sharded by IDP", {"OrderLine": "IDP"}),
+        ]
+        
+        for strategy_name, sharding_dict in sharding_strategies:
+            result = executor.execute_q3(
+                sharding_strategy=sharding_dict,
+                array_sizes=array_sizes.get(db_num)
+            )
+            print_filter_result("Q3", result, strategy_name)
+    
+    if query_choice in ['4', 'all']:
+        # Q4: Stock join query
+        print(f"\n{'#'*70}")
+        print(f"# Testing Q4 on DB{db_num}")
+        print(f"{'#'*70}")
+        
+        sharding_strategies = [
+            ("Stock(IDW), Product(IDP)", {"Stock": "IDW", "Product": "IDP"}),
+            ("Stock(IDP), Product(IDP)", {"Stock": "IDP", "Product": "IDP"}),
+        ]
+        
+        for strategy_name, sharding_dict in sharding_strategies:
+            result = executor.execute_q4(
+                sharding_strategy=sharding_dict,
+                array_sizes=array_sizes.get(db_num)
+            )
+            print_join_result("Q4", result, strategy_name)
+    
+    if query_choice in ['5', 'all']:
+        # Q5: Product stock join query
+        print(f"\n{'#'*70}")
+        print(f"# Testing Q5 on DB{db_num}")
+        print(f"{'#'*70}")
+        
+        sharding_strategies = [
+            ("Product(brand),Stock(IDP)", {"Product": "brand", "Stock": "IDP"}),
+            ("Product(IDP),Stock(IDP)", {"Product": "IDP", "Stock": "IDP"}),
+        ]
+        
+        for strategy_name, sharding_dict in sharding_strategies:
+            result = executor.execute_q5(
+                brand="Apple",
+                sharding_strategy=sharding_dict,
+                array_sizes=array_sizes.get(db_num)
+            )
+            print_join_result("Q5", result, strategy_name)
 
 
 def main():
-    """Main execution - analyze all 5 database designs"""
+    """Main execution - analyze databases or run query tests"""
     
-    # Initialize statistics
-    stats = Statistics()
+    print("="*70)
+    print("Big Data Structure Analysis Tool")
+    print("="*70)
     
-    # Create calculators
-    size_calc = SizeCalculator(stats)
-    shard_calc = ShardCalculator(stats)
+    print("\nSelect mode:")
+    print("1. Database Analysis (sizes, sharding)")
+    print("2. Query Testing (filters, joins)")
     
-    # Demander à l'utilisateur de choisir une base de données
-    while True:
+    mode = input("\nEnter mode (1 or 2): ").strip()
+    
+    if mode == '1':
+        # Database analysis mode
+        stats = Statistics()
+        size_calc = SizeCalculator(stats)
+        shard_calc = ShardCalculator(stats)
+        
+        db_choice = input("\nEnter database number (1-5) or 0 for all: ").strip()
+        
         try:
-            db_choice = int(input("\nEntrez un numéro de base de données (1-5) ou 0 pour analyser toutes : "))
-            if 0 <= db_choice <= 5:
-                break
+            db_num = int(db_choice)
+            if db_num == 0:
+                for i in range(1, 6):
+                    db = SchemaParser.build_db_from_json(i, stats, f"schemas/db{i}.json")
+                    print_db_analysis(db, i, stats, size_calc, shard_calc)
+            elif 1 <= db_num <= 5:
+                db = SchemaParser.build_db_from_json(db_num, stats, f"schemas/db{db_num}.json")
+                print_db_analysis(db, db_num, stats, size_calc, shard_calc)
             else:
-                print("Veuillez entrer un nombre entre 0 et 5.")
+                print("Invalid database number.")
         except ValueError:
-            print("Entrée invalide. Veuillez entrer un nombre.")
+            print("Invalid input.")
     
-    if db_choice == 0:
-        # Analyser toutes les bases de données
-        for i in range(1, 6):
-            db = SchemaParser.build_db_from_json(i, stats,f"schemas/db{i}.json")
-            print_db_analysis(db, i, stats, size_calc, shard_calc)
+    elif mode == '2':
+        # Query testing mode
+        print("\nAvailable databases: 1-5")
+        print("Available queries: 1 (Q1), 2 (Q2), 3 (Q3), 4 (Q4), 5 (Q5)")
+        
+        db_choice = input("\nEnter database number (1-5) or 'all': ").strip()
+        query_choice = input("Enter query number (1-5) or 'all': ").strip()
+        
+        if db_choice.lower() == 'all':
+            databases = [1, 2, 3, 4, 5]
+        else:
+            try:
+                db_num = int(db_choice)
+                if 1 <= db_num <= 5:
+                    databases = [db_num]
+                else:
+                    print("Invalid database number. Using DB1.")
+                    databases = [1]
+            except ValueError:
+                print("Invalid input. Using DB1.")
+                databases = [1]
+        
+        for db_num in databases:
+            try:
+                run_query_tests(db_num, query_choice)
+            except Exception as e:
+                print(f"\nError testing DB{db_num}: {e}")
+                import traceback
+                traceback.print_exc()
+        
+        print("\n" + "="*70)
+        print("Testing Complete!")
+        print("="*70)
+    
     else:
-        # Analyser la base de données choisie
-        db = SchemaParser.build_db_from_json(db_choice, stats,f"schemas/db{db_choice}.json")
-        print_db_analysis(db, db_choice, stats, size_calc, shard_calc)
+        print("Invalid mode selection.")
+
 
 if __name__ == "__main__":
     main()

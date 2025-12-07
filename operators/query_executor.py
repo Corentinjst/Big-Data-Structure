@@ -30,8 +30,6 @@ class QueryExecutor:
 
     def execute_q1(
         self,
-        idp_value: int,
-        idw_value: int,
         sharding_strategy: Dict[str, str],
         array_sizes: Optional[Dict[str, int]] = None
     ) -> FilterResult:
@@ -42,8 +40,6 @@ class QueryExecutor:
         WHERE S.IDP = $IDP AND S.IDW = $IDW
 
         Args:
-            idp_value: Product ID value
-            idw_value: Warehouse ID value
             sharding_strategy: Dict mapping collection names to sharding keys
             array_sizes: Average array sizes
 
@@ -58,7 +54,6 @@ class QueryExecutor:
         output_keys = ["quantity", "location"]
         filter_keys = ["IDP","IDW"]
 
-        # Very selective - looking for exact match
         selectivity = 1 / stock_collection.document_count
 
         return self.filter_op.filter(
@@ -117,7 +112,6 @@ class QueryExecutor:
 
     def execute_q3(
         self,
-        date: str,
         sharding_strategy: Dict[str, str],
         array_sizes: Optional[Dict[str, int]] = None
     ) -> FilterResult:
@@ -128,7 +122,6 @@ class QueryExecutor:
         WHERE O.date = $date
 
         Args:
-            date: Order date
             sharding_strategy: Dict mapping collection names to sharding keys
             array_sizes: Average array sizes
 
@@ -157,7 +150,6 @@ class QueryExecutor:
 
     def execute_q4(
         self,
-        idw_value: int,
         sharding_strategy: Dict[str, str],
         array_sizes: Optional[Dict[str, int]] = None
     ) -> JoinResult:
@@ -168,7 +160,6 @@ class QueryExecutor:
         WHERE S.IDW = $IDW
 
         Args:
-            idw_value: Warehouse ID value
             sharding_strategy: Dict mapping collection names to sharding keys
             array_sizes: Average array sizes
 
@@ -188,10 +179,6 @@ class QueryExecutor:
         left_output_keys = ["quantity"]
         right_output_keys = ["name"]
 
-
-
-
-        # Filter selectivity: 1 warehouse out of 200
         left_filter_selectivity = 1 / self.statistics.num_warehouses
         right_filter_selectivity = 1 / product_collection.document_count
 
