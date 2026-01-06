@@ -8,6 +8,7 @@ from models.schema import Database
 from models.statistics import Statistics
 from .filter_operator import FilterOperator, FilterResult
 from .join_operator import NestedLoopJoinOperator, JoinResult
+from .aggregate_operator import AggregateOperator, AggregateResult
 
 
 class QueryExecutor:
@@ -27,6 +28,7 @@ class QueryExecutor:
         self.statistics = statistics
         self.filter_op = FilterOperator(statistics)
         self.join_op = NestedLoopJoinOperator(statistics)
+        self.aggregate_op = AggregateOperator(statistics)
 
     def execute_q1(
         self,
@@ -252,4 +254,133 @@ class QueryExecutor:
             right_filter_selectivity=right_filter_selectivity,
             array_sizes=array_sizes
         )
+
+    def execute_q6(
+        self,
+        sharding_strategy: Dict[str, str],
+        array_sizes: Optional[Dict[str, int]] = None
+    ) -> Tuple[AggregateResult, JoinResult]:
+        """
+        Q6: The 100 most ordered product names and price (sum of quantities)
+        SELECT P.name, P.price, OL.NB
+        FROM Product P JOIN (
+            SELECT O.IDP, SUM(O.quantity) AS NB
+            FROM OrderLine O
+            GROUP BY O.IDP
+        ) OL ON P.IDP = OL.IDP
+        ORDER BY OL.NB DESC
+        LIMIT 100;
+        
+        
+        Args:
+            sharding_strategy: Dict mapping collection names to sharding keys
+            array_sizes: Average array sizes
+            
+        Returns:
+            AggregateResult
+        """
+        
+        orderline_collection = self.database.get_collection("OrderLine")
+        product_collection = self.database.get_collection("Product")
+
+        if not orderline_collection or not product_collection:
+            raise ValueError("Required collections not found")
+        
+        orderline_sharding = sharding_strategy.get("OrderLine")
+        product_sharding = sharding_strategy.get("Product") 
+
+        left_output_keys = ["name","price"]
+        # We put all keys
+        right_output_keys = ["quantity","IDP","quantity"]
+        right_group_by_key = "IDP"
+        
+
+        left_filter_selectivity = 1 / self.statistics.num_products
+        right_filter_selectivity = self.statistics.num_products / self.statistics.num_order_lines
+
+
+        limit = 100
+        
+        # GROUP BY IDP, SUM(quantity)
+        return self.aggregate_op.aggregator(
+            left_collection=product_collection,
+            right_collection=orderline_collection,
+            join_key="IDP",
+            limit=limit,
+            left_output_keys=left_output_keys,
+            right_output_keys =right_output_keys,
+            left_sharding_key=product_sharding,
+            right_sharding_key=orderline_sharding,
+            right_group_by_key=right_group_by_key,
+            left_filter_selectivity=left_filter_selectivity,
+            right_filter_selectivity=right_filter_selectivity,
+            array_sizes=array_sizes
+        )
+        
+
+    def execute_q7(
+        self,
+        sharding_strategy: Dict[str, str],
+        array_sizes: Optional[Dict[str, int]] = None
+    ) -> Tuple[AggregateResult, JoinResult]:
+        """
+        Q7: Name and price of the product most ordered by customer no. 125;
+        SELECT P.name, P.price, OL.NB
+        FROM Product P JOIN (
+            SELECT O.IDP, SUM(O.quantity) AS NB
+            FROM OrderLine O
+            WHERE O.IDC = $clientId
+            GROUP BY O.IDP
+        ) OL ON P.IDP = OL.IDP
+        ORDER BY OL.NB DESC
+        LIMIT 1;
+        
+        Args:
+            sharding_strategy: Dict mapping collection names to sharding keys
+            array_sizes: Average array sizes
+            
+        Returns:
+            AggregateResult
+        """
+        
+        
+        product_collection = self.database.get_collection("Product")
+        orderline_collection = self.database.get_collection("OrderLine")
+
+        if not orderline_collection or not product_collection:
+            raise ValueError("Required collections not found")
+        
+        product_sharding = sharding_strategy.get("Product")
+        orderline_sharding = sharding_strategy.get("OrderLine")
+
+
+        left_output_keys = ["name","price"]
+        right_output_keys = ["quantity"]
+        right_group_by_key = "IDP"
+        right_filter_keys = ["IDC"]
+
+        left_filter_selectivity = 1 / self.statistics.num_products
+        right_filter_selectivity = self.statistics.products_per_customer / self.statistics.num_order_lines
+
+        limit = 1
+
+        
+        
+        
+        return self.aggregate_op.aggregator(
+            left_collection=product_collection,
+            right_collection=orderline_collection,
+            join_key="IDP",
+            limit=limit,
+            left_output_keys=left_output_keys,
+            right_output_keys =right_output_keys,
+            left_sharding_key=product_sharding,
+            right_sharding_key=orderline_sharding,
+            right_filter_keys=right_filter_keys,
+            right_group_by_key=right_group_by_key,
+            left_filter_selectivity=left_filter_selectivity,
+            right_filter_selectivity=right_filter_selectivity,
+            array_sizes=array_sizes
+        )
+
 

@@ -33,6 +33,7 @@ Big-Data-Structure/
 │   ├── cost_model.py            # Cost calculation model (time, carbon, price)
 │   ├── filter_operator.py       # Filter query execution
 │   ├── join_operator.py         # Nested loop join execution
+│   ├── aggregate_operator.py    # Aggregate query execution (GROUP BY)
 │   └── query_executor.py        # High-level query executor
 ├── config/                      # Configuration
 │   ├── __init__.py
@@ -274,6 +275,53 @@ Executes nested loop joins between two collections.
 - `left_filter_selectivity`, `right_filter_selectivity`: Filter selectivity
 - `array_sizes`: Average array sizes
 
+#### AggregateOperator (`aggregate_operator.py`)
+
+Executes aggregate queries with GROUP BY and optional joins.
+
+**AggregateResult** - Dataclass with results:
+- `output_size_bytes1`, `output_size_bytes2`: Output document sizes
+- `input_size_bytes1`, `input_size_bytes2`: Input document sizes
+- `shuffle_size_bytes1`, `shuffle_size_bytes2`: Shuffle data sizes
+- `cost`: QueryCost object
+- `s1`, `s2`: Number of servers accessed
+- `o1`, `o2`: Number of output documents
+- `shuffle1`, `shuffle2`: Number of documents shuffled
+- `c1_volume_bytes`, `c2_volume_bytes`: Data volumes
+- `num_loops`: Number of loop iterations
+- `join_key`: Key used for join
+- `left_group_by_key`, `right_group_by_key`: GROUP BY keys
+- `left_sharding_key`, `right_sharding_key`: Sharding keys
+
+**Main Method:**
+
+`aggregator(left_collection, right_collection, join_key, limit, left_output_keys, right_output_keys, ...)`
+- Executes aggregate query with GROUP BY and join
+- **Parameters:**
+  - `left_collection`, `right_collection`: Collections to aggregate
+  - `join_key`: Field to join on
+  - `limit`: Number of results to return
+  - `left_output_keys`, `right_output_keys`: Output fields
+  - `left_group_by_key`, `right_group_by_key`: Fields to group by
+  - `left_sharding_key`, `right_sharding_key`: Sharding keys
+  - `left_filter_keys`, `right_filter_keys`: Pre-filter keys
+  - `left_filter_selectivity`, `right_filter_selectivity`: Filter selectivity
+  - `array_sizes`: Average array sizes
+
+**Logic:**
+- Applies filters on both collections
+- Computes GROUP BY aggregation
+- Handles shuffle phase when GROUP BY key differs from sharding key
+- Performs join between aggregated results
+- **Shuffle optimization:** No shuffle if GROUP BY key matches sharding key
+- **Sharding on filter key:** Query goes to subset of servers
+- Calculates C1 and C2 volumes including shuffle cost
+
+**Shuffle Phase:**
+- If `group_by_key == sharding_key`: No shuffle needed (0 documents)
+- Otherwise: `shuffle = output_docs × (num_servers - 1)`
+- Shuffle cost included in total data volume
+
 #### QueryExecutor (`query_executor.py`)
 
 High-level executor for predefined queries (Q1-Q5).
@@ -315,11 +363,37 @@ FROM Product P JOIN Stock S ON P.IDP = S.IDP
 WHERE P.brand = "Apple"
 ```
 
+**Q6** - `execute_q6(sharding_strategy, array_sizes)`
+```sql
+SELECT P.name, P.price, OL.NB
+FROM Product P JOIN (
+    SELECT O.IDP, SUM(O.quantity) AS NB
+    FROM OrderLine O
+    GROUP BY O.IDP
+) OL ON P.IDP = OL.IDP
+ORDER BY OL.NB DESC
+LIMIT 100
+```
+
+**Q7** - `execute_q7(sharding_strategy, array_sizes)`
+```sql
+SELECT P.name, P.price, OL.NB
+FROM Product P JOIN (
+    SELECT O.IDP, SUM(O.quantity) AS NB
+    FROM OrderLine O
+    WHERE O.IDC = 125
+    GROUP BY O.IDP
+) OL ON P.IDP = OL.IDP
+ORDER BY OL.NB DESC
+LIMIT 1
+```
+
 **Features:**
-- Uses FilterOperator and NestedLoopJoinOperator
+- Uses FilterOperator, NestedLoopJoinOperator, and AggregateOperator
 - Supports multiple sharding strategies
 - Calculates selectivity based on statistics
 - Returns detailed cost breakdown
+- Q6 and Q7 demonstrate aggregate queries with GROUP BY and joins
 
 ### 5. Configuration (`config/`)
 
@@ -367,6 +441,7 @@ python main.py
 **Mode 2: Query Testing (TD2/TD3)**
 - Test filter queries (Q1, Q2, Q3)
 - Test join queries (Q4, Q5)
+- Test aggregate queries with GROUP BY (Q6, Q7)
 - Compare different sharding strategies
 - View detailed cost breakdowns (time, carbon, price)
 
@@ -443,6 +518,52 @@ QueryCost(
   Data Volume: 13,340,000 bytes (12.72 MB)
   Documents accessed: 10,400
   Servers involved: 1000
+)
+```
+
+### Example Output - Aggregate Query (Q7)
+
+```
+======================================================================
+Q7 - Sharding Strategy: OrderLine(IDC),Product(IDP)
+Join Key: IDP
+======================================================================
+
+--- TD2 Correction Format ---
+Column               Value                    
+---------------------------------------------
+Sharding             OrderLine(IDC),Product(IDP)
+
+--- Right Collection (OrderLine - GROUP BY) ---
+S1 (servers)         1
+O1 (docs)            20
+Shuffle1 (docs)      0
+Input Size: 32 bytes
+Output Size: 12 bytes
+Shuffle Size: 12 bytes
+
+--- Left Collection (Product) ---
+S2 (servers)         1000
+O2 (docs)            1
+Shuffle2 (docs)      0
+Input Size: 200 bytes
+Output Size: 188 bytes
+Shuffle Size: 12 bytes
+
+--- Volumes ---
+C1 (bytes)           12,880 (0.0123 MB)
+C2 (bytes)           200,188 (0.1909 MB)
+Total Vt             213,068 bytes
+Loops                1
+
+--- Costs ---
+QueryCost(
+  Time: 95.421 ms (0.095 s)
+  Carbon: 95.52 gCO2
+  Price: $0.009542 USD
+  Data Volume: 213,068 bytes (0.20 MB)
+  Documents accessed: 4,000,021
+  Servers involved: 1001
 )
 ```
 

@@ -19,10 +19,9 @@ TYPE_SIZES = {
     'longstring': LONG_STRING_SIZE
 }
 
-# ATTENTION CONVERTIR EN OCTET/S ?
 
 # Network and query execution constants
-BANDWIDTH_SPEED = 15_000_000  
+BANDWIDTH_SPEED = 15_000_000  #bytes per second
 BANDWIDTH_SPEED_BYTES_PER_MS = BANDWIDTH_SPEED / 1000  # bytes per millisecond
 
 # Cost constants

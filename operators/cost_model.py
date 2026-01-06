@@ -197,7 +197,8 @@ class CostModel:
         Calculate the cost of a nested loop join operation
 
         Args:
-            total_document_accessed: Total number of documents accessed
+            total_document_accessed_left: Total number of documents accessed on the left part of the query
+             total_document_accessed_right: Total number of documents accessed on the right part of the query
             doc_size_bytes: Average size of documents
             c1: C1 volume: #S1 * size(S1) + #O1 * size(O1)
             c2: C2 volume: #S2 * size(S2) + #O2 * size(O2)
@@ -263,4 +264,5 @@ class CostModel:
         total_comm_cost = c1_cost + c2_cost_total
 
         return total_comm_cost
+
 

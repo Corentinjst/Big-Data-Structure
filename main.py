@@ -152,6 +152,51 @@ def print_filter_result(query_name: str, result, sharding_strategy: str):
     print(result.cost)
 
 
+def print_aggregate_result(query_name: str, result, sharding_strategy: str):
+    """Print join query results in TD2 correction format"""
+    print(f"\n{'='*70}")
+    print(f"{query_name} - Sharding Strategy: {sharding_strategy}")
+    print(f"Join Key: {result.join_key}")
+    print(f"{'='*70}")
+
+    print("\n--- TD2 Correction Format ---")
+    print(f"{'Column':<20} {'Value':<25}")
+    print(f"{'-'*45}")
+    print(f"{'Sharding':<20} {sharding_strategy}")
+
+    # C1 section
+    print(f"\n{'--- C1 Phase ---':<20}")
+    print(f"Group_By Key: {result.right_group_by_key}")
+    print(f"{'S1 (docs)':<20} {result.s1:,}")
+    print(f"{'O1 (docs)':<20} {result.o1:,}")
+    print(f"{'Shuffle1 (docs)':<20} {result.shuffle1:,}")
+    print(f"Input Size: {result.input_size_bytes1:,} bytes ({result.input_size_bytes1/1024/1024:.2f} MB)")
+    print(f"Output Size: {result.output_size_bytes1:,} bytes ({result.output_size_bytes1/1024/1024:.2f} MB)")
+    print(f"Shuffle Size: {result.shuffle_size_bytes1:,} bytes ({result.shuffle_size_bytes1/1024/1024:.2f} MB)")
+
+    # C2 section
+    print(f"\n{'--- C2 Phase ---':<20}")
+    print(f"{'Loops':<20} {result.num_loops:,}")
+    if(result.left_group_by_key):print(f"Group_By Key: {result.left_group_by_key}")
+    print(f"{'S2 (docs)':<20} {result.s2:,}")
+    print(f"{'O2 (docs)':<20} {result.o2:,}")
+    print(f"{'Shuffle2 (docs)':<20} {result.shuffle2:,}")
+    print(f"Input Size: {result.input_size_bytes2:,} bytes ({result.input_size_bytes2/1024/1024:.2f} MB)")
+    print(f"Output Size: {result.output_size_bytes2:,} bytes ({result.output_size_bytes2/1024/1024:.2f} MB)")
+    print(f"Shuffle Size: {result.shuffle_size_bytes2:,} bytes ({result.shuffle_size_bytes2/1024/1024:.2f} MB)")
+
+    # Volumes
+    print(f"\n{'--- Volumes ---':<20}")
+    print(f"{'C1 (bytes)':<20} {result.c1_volume_bytes:,} ({result.c1_volume_bytes/1024/1024:.4f} MB)")
+    print(f"{'C2 (bytes)':<20} {result.c2_volume_bytes:,} ({result.c2_volume_bytes/1024/1024:.4f} MB)")
+    print(f"{'Total Vt':<20} {result.c1_volume_bytes + result.num_loops * result.c2_volume_bytes:,} bytes")
+    
+    # Costs
+    print(f"\n--- Costs ---")
+    print(result.cost)
+
+
+
 def print_join_result(query_name: str, result, sharding_strategy: str):
     """Print join query results in TD2 correction format"""
     print(f"\n{'='*70}")
@@ -295,6 +340,42 @@ def run_query_tests(db_num: int, query_choice: str):
                 array_sizes=array_sizes.get(db_num)
             )
             print_join_result("Q5", result, strategy_name)
+    
+    if query_choice in ['6', 'all']:
+        # Q6: Aggregate + Join query (product with highest total quantity)
+        print(f"\n{'#'*70}")
+        print(f"# Testing Q6 on DB{db_num}")
+        print(f"{'#'*70}")
+        
+        sharding_strategies = [
+            ("OrderLine(IDC), Product(IDP)", {"OrderLine": "IDC", "Product": "IDP"}),
+            ("OrderLine(IDP), Product(brand)", {"OrderLine": "IDP", "Product": "branc"}),
+        ]
+        
+        for strategy_name, sharding_dict in sharding_strategies:
+            agg_result = executor.execute_q6(
+                sharding_strategy=sharding_dict,
+                array_sizes=array_sizes.get(db_num)
+            )
+            print_aggregate_result("Q6", agg_result, strategy_name)
+    
+    if query_choice in ['7', 'all']:
+        # Q7: Aggregate + Join query with client filter
+        print(f"\n{'#'*70}")
+        print(f"# Testing Q7 on DB{db_num}")
+        print(f"{'#'*70}")
+        
+        sharding_strategies = [
+            ("OrderLine(IDC), Product(IDP)", {"OrderLine": "IDC", "Product": "IDP"}),
+            ("OrderLine(IDP), Product(IDP)", {"OrderLine": "IDP", "Product": "IDP"}),
+        ]
+        
+        for strategy_name, sharding_dict in sharding_strategies:
+            agg_result = executor.execute_q7(
+                sharding_strategy=sharding_dict,
+                array_sizes=array_sizes.get(db_num)
+            )
+            print_aggregate_result("Q7", agg_result, strategy_name)
 
 
 def main():
@@ -335,10 +416,10 @@ def main():
     elif mode == '2':
         # Query testing mode
         print("\nAvailable databases: 1-5")
-        print("Available queries: 1 (Q1), 2 (Q2), 3 (Q3), 4 (Q4), 5 (Q5)")
+        print("Available queries: 1 (Q1), 2 (Q2), 3 (Q3), 4 (Q4), 5 (Q5), 6 (Q6), 7 (Q7)")
         
         db_choice = input("\nEnter database number (1-5) or 'all': ").strip()
-        query_choice = input("Enter query number (1-5) or 'all': ").strip()
+        query_choice = input("Enter query number (1-7) or 'all': ").strip()
         
         if db_choice.lower() == 'all':
             databases = [1, 2, 3, 4, 5]
