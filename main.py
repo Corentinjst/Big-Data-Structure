@@ -376,6 +376,23 @@ def run_query_tests(db_num: int, query_choice: str):
                 array_sizes=array_sizes.get(db_num)
             )
             print_aggregate_result("Q7", agg_result, strategy_name)
+    
+    if query_choice in ['8', 'all']:
+        # Q7: Aggregate + Join query with client filter
+        print(f"\n{'#'*70}")
+        print(f"# Testing Q8 on DB{db_num}")
+        print(f"{'#'*70}")
+        
+        sharding_strategies = [
+            ("Stock(IDP), Warehouse(IDW)", {"Stock": "IDP", "Warehouse": "IDW"})
+        ]
+        
+        for strategy_name, sharding_dict in sharding_strategies:
+            agg_result = executor.execute_q8(
+                sharding_strategy=sharding_dict,
+                array_sizes=array_sizes.get(db_num)
+            )
+            print_join_result("Q8", agg_result, strategy_name)
 
 
 def main():
@@ -416,10 +433,10 @@ def main():
     elif mode == '2':
         # Query testing mode
         print("\nAvailable databases: 1-5")
-        print("Available queries: 1 (Q1), 2 (Q2), 3 (Q3), 4 (Q4), 5 (Q5), 6 (Q6), 7 (Q7)")
+        print("Available queries: 1 (Q1), 2 (Q2), 3 (Q3), 4 (Q4), 5 (Q5), 6 (Q6), 7 (Q7), 8 (Q8)")
         
         db_choice = input("\nEnter database number (1-5) or 'all': ").strip()
-        query_choice = input("Enter query number (1-7) or 'all': ").strip()
+        query_choice = input("Enter query number (1-8) or 'all': ").strip()
         
         if db_choice.lower() == 'all':
             databases = [1, 2, 3, 4, 5]

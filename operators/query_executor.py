@@ -382,5 +382,55 @@ class QueryExecutor:
             right_filter_selectivity=right_filter_selectivity,
             array_sizes=array_sizes
         )
+    
+    def execute_q8(
+        self,
+        sharding_strategy: Dict[str, str],
+        array_sizes: Optional[Dict[str, int]] = None
+    ) -> JoinResult:
+        """
+        Q9: 
+        SELECT S.IDP, S.quantity
+        FROM Warehouse W JOIN Stock S ON W.IDW = S.IDW
+        WHERE W.IDW = 1;
+
+        Args:
+            sharding_strategy: Dict mapping collection names to sharding keys
+            array_sizes: Average array sizes
+
+        Returns:
+            JoinResult
+        """
+
+        warehouse_collection = self.database.get_collection("Warehouse")
+        stock_collection = self.database.get_collection("Stock")
+
+        if not stock_collection or not warehouse_collection:
+            raise ValueError("Required collections not found")
+
+        warehouse_sharding = sharding_strategy.get("Warehouse")
+        stock_sharding = sharding_strategy.get("Stock")
+        
+        left_output_keys = []
+        right_output_keys = ["IDP","quantity"]
+
+        left_filter_selectivity = 1 / self.statistics.num_warehouses
+        right_filter_selectivity = 1 / self.statistics.num_warehouses
+
+        return self.join_op.nested_loop_join(
+            left_collection=warehouse_collection,
+            right_collection=stock_collection,
+            join_key="IDW",
+            left_output_keys=left_output_keys,
+            right_output_keys=right_output_keys,
+            left_sharding_key=warehouse_sharding,
+            right_sharding_key=stock_sharding,
+            left_filter_keys=["IDW"],
+            left_filter_selectivity=left_filter_selectivity,
+            right_filter_selectivity=right_filter_selectivity,
+            array_sizes=array_sizes
+        )
+    
+    
 
 
